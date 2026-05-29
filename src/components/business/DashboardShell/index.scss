@@ -1,0 +1,302 @@
+/**
+ * 文件说明：个人档案主控制台样式
+ * 样式说明：定义侧边栏、顶部栏、模块卡片和上传入口
+ * 关键布局说明：桌面端固定侧边栏，移动端侧边栏折叠为顶部横向区域
+ */
+
+@use "~/styles/variables.scss" as *;
+@use "~/styles/mixins.scss" as *;
+
+.dashboard-shell {
+  background:
+    linear-gradient(180deg, rgba(59, 130, 246, 0.12), transparent 260px),
+    $color-bg-main;
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr);
+  min-height: 100vh;
+
+  &__sidebar {
+    background: $color-bg-sidebar;
+    border-right: 1px solid $color-border-soft;
+    display: flex;
+    flex-direction: column;
+    gap: $space-6;
+    height: 100vh;
+    overflow-y: auto;
+    padding: $space-6 $space-4;
+    position: sticky;
+    top: 0;
+  }
+
+  &__brand {
+    align-items: center;
+    display: flex;
+    gap: $space-3;
+    padding: 0 $space-2;
+  }
+
+  &__brand-mark {
+    align-items: center;
+    background: linear-gradient(135deg, #0284c7, #3b82f6);
+    border-radius: $radius-md;
+    color: #ffffff;
+    display: inline-flex;
+    font-weight: 900;
+    height: 42px;
+    justify-content: center;
+    width: 42px;
+  }
+
+  &__brand-en {
+    color: $color-primary;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0;
+    margin: 0;
+    text-transform: uppercase;
+  }
+
+  &__brand-name {
+    display: block;
+    font-size: 18px;
+    margin-top: $space-1;
+  }
+
+  &__nav {
+    display: grid;
+    gap: $space-2;
+  }
+
+  &__nav-item {
+    align-items: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: $radius-sm;
+    color: $color-text-muted;
+    display: grid;
+    gap: $space-2;
+    grid-template-columns: 10px 1fr auto;
+    min-height: 42px;
+    padding: 0 $space-3;
+    text-align: left;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.56);
+      border-color: rgba(14, 165, 233, 0.22);
+      color: $color-text-main;
+    }
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+
+  &__nav-dot {
+    border-radius: 999px;
+    height: 8px;
+    width: 8px;
+
+    &--blue {
+      background: #38bdf8;
+    }
+
+    &--cyan {
+      background: #22d3ee;
+    }
+
+    &--indigo {
+      background: #818cf8;
+    }
+
+    &--teal {
+      background: #2dd4bf;
+    }
+
+    &--sky {
+      background: #7dd3fc;
+    }
+
+    &--violet {
+      background: #a78bfa;
+    }
+  }
+
+  &__nav-count {
+    color: $color-text-soft;
+    font-size: 12px;
+  }
+
+  &__main {
+    display: grid;
+    gap: $space-4;
+    padding: $space-5;
+  }
+
+  &__topbar {
+    align-items: end;
+    display: flex;
+    gap: $space-4;
+    justify-content: space-between;
+  }
+
+  &__search {
+    max-width: 520px;
+    width: 100%;
+  }
+
+  &__hero {
+    background:
+      linear-gradient(135deg, rgba(2, 132, 199, 0.1), rgba(59, 130, 246, 0.06)),
+      $color-bg-panel;
+    border: 1px solid $color-border-soft;
+    border-radius: $radius-md;
+    padding: $space-5;
+  }
+
+  &__eyebrow {
+    color: $color-primary;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0;
+    margin: 0 0 $space-2;
+    text-transform: uppercase;
+  }
+
+  &__title {
+    font-size: clamp(24px, 3vw, 34px);
+    line-height: 1.12;
+    margin: 0;
+  }
+
+  &__description {
+    color: $color-text-muted;
+    line-height: 1.6;
+    margin: $space-2 0 0;
+    max-width: 760px;
+  }
+
+  &__upload-tip {
+    color: $color-accent;
+    font-size: 13px;
+    margin: -#{$space-2} 0 0;
+  }
+
+  &__grid {
+    display: grid;
+    gap: $space-3;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  &__module {
+    @include panel-surface;
+    transition:
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      transform 180ms ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 150px;
+    padding: $space-4;
+    position: relative;
+
+    &::before {
+      border-radius: $radius-sm;
+      content: "";
+      height: 4px;
+      left: $space-5;
+      position: absolute;
+      right: $space-4;
+      top: 0;
+    }
+
+    &:hover {
+      border-color: rgba(14, 165, 233, 0.3);
+      box-shadow: 0 16px 34px rgba(30, 64, 105, 0.16);
+      transform: translateY(-2px);
+    }
+
+    &--blue::before {
+      background: #38bdf8;
+    }
+
+    &--cyan::before {
+      background: #22d3ee;
+    }
+
+    &--indigo::before {
+      background: #818cf8;
+    }
+
+    &--teal::before {
+      background: #2dd4bf;
+    }
+
+    &--sky::before {
+      background: #7dd3fc;
+    }
+
+    &--violet::before {
+      background: #a78bfa;
+    }
+  }
+
+  &__module-count {
+    color: $color-primary;
+    font-size: 26px;
+    font-weight: 900;
+    line-height: 1;
+    margin: 0 0 $space-3;
+  }
+
+  &__module-title {
+    font-size: 18px;
+    margin: 0 0 $space-2;
+  }
+
+  &__module-description {
+    color: $color-text-muted;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0;
+  }
+}
+
+@media (max-width: 1080px) {
+  .dashboard-shell {
+    grid-template-columns: 1fr;
+
+    &__sidebar {
+      border-bottom: 1px solid $color-border-soft;
+      border-right: 0;
+      height: auto;
+      position: static;
+    }
+
+    &__nav {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    &__grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+}
+
+@media (max-width: 720px) {
+  .dashboard-shell {
+    &__main {
+      padding: $space-4;
+    }
+
+    &__topbar {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    &__nav,
+    &__grid {
+      grid-template-columns: 1fr;
+    }
+  }
+}

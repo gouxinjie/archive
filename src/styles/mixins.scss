@@ -1,0 +1,25 @@
+/**
+ * 文件说明：全局 SCSS 混合宏
+ * 样式说明：封装常用布局和交互效果
+ * 关键布局说明：减少重复声明，保持组件样式一致
+ */
+
+@use "./variables.scss" as *;
+
+@mixin focus-ring {
+  outline: 2px solid rgba(56, 189, 248, 0.36);
+  outline-offset: 2px;
+}
+
+@mixin panel-surface {
+  background: $color-bg-panel;
+  border: 1px solid $color-border-soft;
+  border-radius: $radius-md;
+  box-shadow: $shadow-panel;
+}
+
+@mixin text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

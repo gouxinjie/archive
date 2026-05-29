@@ -1,0 +1,49 @@
+/**
+ * 文件说明：通用输入框组件样式
+ * 样式说明：定义标签、输入框、错误状态和聚焦状态
+ * 关键布局说明：组件内部垂直排布，适合表单和搜索区域复用
+ */
+
+@use "~/styles/variables.scss" as *;
+@use "~/styles/mixins.scss" as *;
+
+.archive-input {
+  display: grid;
+  gap: $space-2;
+
+  &__label {
+    color: $color-text-muted;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  &__control {
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid $color-border;
+    border-radius: $radius-sm;
+    color: $color-text-main;
+    min-height: 42px;
+    padding: 0 $space-3;
+    width: 100%;
+
+    &::placeholder {
+      color: $color-text-soft;
+    }
+
+    &:focus {
+      @include focus-ring;
+      border-color: rgba(14, 165, 233, 0.72);
+    }
+
+    &:disabled {
+      background: rgba(226, 232, 240, 0.62);
+      color: $color-text-muted;
+      cursor: not-allowed;
+    }
+  }
+
+  &__error {
+    color: $color-danger;
+    font-size: 12px;
+  }
+}

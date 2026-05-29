@@ -1,0 +1,76 @@
+/**
+ * 文件说明：通用拖拽上传样式
+ * 样式说明：定义拖拽区域、悬停状态、说明文字和隐藏文件输入框
+ * 关键布局说明：桌面端横向排列，移动端自动换行
+ */
+
+@use "~/styles/variables.scss" as *;
+@use "~/styles/mixins.scss" as *;
+
+.archive-dropzone {
+  align-items: center;
+  background:
+    linear-gradient(135deg, rgba(2, 132, 199, 0.1), rgba(59, 130, 246, 0.05)),
+    rgba(255, 255, 255, 0.7);
+  border: 1px dashed rgba(14, 165, 233, 0.34);
+  border-radius: $radius-md;
+  display: flex;
+  gap: $space-4;
+  min-height: 76px;
+  padding: $space-4;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+
+  &--hovering {
+    background:
+      linear-gradient(135deg, rgba(2, 132, 199, 0.16), rgba(59, 130, 246, 0.08)),
+      rgba(255, 255, 255, 0.9);
+    border-color: rgba(14, 165, 233, 0.68);
+    transform: translateY(-1px);
+  }
+
+  &__mark {
+    align-items: center;
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.28);
+    border-radius: $radius-md;
+    color: $color-primary;
+    display: inline-flex;
+    flex: 0 0 44px;
+    font-size: 22px;
+    font-weight: 700;
+    height: 36px;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  &__content {
+    flex: 1;
+    min-width: 180px;
+  }
+
+  &__title {
+    font-size: 14px;
+    margin: 0 0 $space-1;
+  }
+
+  &__description {
+    color: $color-text-muted;
+    font-size: 13px;
+    line-height: 1.4;
+    margin: 0;
+  }
+
+  &__input {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .archive-dropzone {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

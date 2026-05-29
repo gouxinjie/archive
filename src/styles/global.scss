@@ -1,0 +1,55 @@
+/**
+ * 文件说明：应用全局基础样式
+ * 样式说明：定义页面背景、字体、滚动条和选中文本颜色
+ * 关键布局说明：全局样式仅服务应用壳层，不定义业务组件样式
+ */
+
+body {
+  min-width: 320px;
+  background: $color-bg-main;
+  color: $color-text-main;
+  font-family: $font-family-base;
+}
+
+.archive-page-loading {
+  align-items: center;
+  background: $color-bg-main;
+  color: $color-text-muted;
+  display: grid;
+  font-size: 14px;
+  min-height: 100vh;
+  place-items: center;
+}
+
+.page-enter-active,
+.page-leave-active {
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.page-enter-from,
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+::selection {
+  background: rgba(59, 130, 246, 0.22);
+  color: $color-text-main;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #b5cadc;
+  border: 2px solid $color-bg-main;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-track {
+  background: #e3edf6;
+}

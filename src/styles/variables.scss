@@ -1,0 +1,40 @@
+/**
+ * 文件说明：全局冷色主题变量
+ * 样式说明：集中维护颜色、间距、圆角、阴影等设计令牌
+ * 关键布局说明：供页面、组件和业务模块通过 SCSS 变量复用
+ */
+
+$color-bg-main: #e8f1fb;
+$color-bg-sidebar: #d7e6f5;
+$color-bg-panel: #f8fbff;
+$color-bg-panel-soft: #eef5fd;
+$color-bg-elevated: #ffffff;
+
+$color-border: #b7cce4;
+$color-border-soft: #d3e2f1;
+
+$color-text-main: #14243a;
+$color-text-muted: #4e6682;
+$color-text-soft: #7a91aa;
+
+$color-primary: #0284c7;
+$color-primary-hover: #0369a1;
+$color-accent: #3b82f6;
+$color-success: #0891b2;
+$color-warning: #fbbf24;
+$color-danger: #fb7185;
+
+$radius-sm: 6px;
+$radius-md: 8px;
+$radius-lg: 12px;
+
+$space-1: 4px;
+$space-2: 8px;
+$space-3: 12px;
+$space-4: 16px;
+$space-5: 20px;
+$space-6: 24px;
+$space-8: 32px;
+
+$shadow-panel: 0 10px 28px rgba(30, 64, 105, 0.12);
+$font-family-base: Inter, "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;

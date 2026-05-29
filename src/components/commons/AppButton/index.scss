@@ -1,0 +1,80 @@
+/**
+ * 文件说明：通用按钮组件样式
+ * 样式说明：定义按钮尺寸、状态、加载动效和冷色调变体
+ * 关键布局说明：按钮使用 inline-flex 保证图标和文本垂直居中
+ */
+
+@use "~/styles/variables.scss" as *;
+@use "~/styles/mixins.scss" as *;
+
+.archive-button {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: $radius-sm;
+  display: inline-flex;
+  font-weight: 700;
+  gap: $space-2;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 $space-4;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.62;
+  }
+
+  &:not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+
+  &--primary {
+    background: $color-primary;
+    color: #ffffff;
+
+    &:not(:disabled):hover {
+      background: $color-primary-hover;
+    }
+  }
+
+  &--secondary {
+    background: rgba(14, 165, 233, 0.1);
+    border-color: rgba(14, 165, 233, 0.24);
+    color: $color-accent;
+  }
+
+  &--danger {
+    background: rgba(251, 113, 133, 0.12);
+    border-color: rgba(251, 113, 133, 0.3);
+    color: $color-danger;
+  }
+
+  &--ghost {
+    background: rgba(255, 255, 255, 0.34);
+    border-color: $color-border;
+    color: $color-text-muted;
+  }
+
+  &__spinner {
+    animation: archive-button-spin 720ms linear infinite;
+    border: 2px solid rgba(255, 255, 255, 0.44);
+    border-radius: 999px;
+    border-top-color: #ffffff;
+    height: 16px;
+    width: 16px;
+  }
+}
+
+@keyframes archive-button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

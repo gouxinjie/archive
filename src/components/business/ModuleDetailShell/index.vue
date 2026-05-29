@@ -9,6 +9,7 @@
 
 import { computed, ref, watch } from 'vue';
 import {
+  Close,
   Delete,
   EditPen,
   Hide,
@@ -26,6 +27,7 @@ import {
   ElInput,
   ElLink,
   ElOption,
+  ElPagination,
   ElPopconfirm,
   ElSelect,
   ElTable,
@@ -42,10 +44,15 @@ import type { DashboardSummaryData } from '~/types/api';
 import type {
   ArchiveModuleConfig,
   ArchiveModuleKey,
+  DocumentDetailData,
+  DocumentFileType,
+  DocumentFormPayload,
+  DocumentListItem,
   FileAssetListItem,
   PasswordFormPayload,
   PasswordListItem
 } from '~/types/models';
+import { request } from '~/utils/request';
 
 interface ModuleDetailShellProps {
   /** 类型：ArchiveModuleConfig；含义：当前模块配置；是否必填：是；默认值：无 */
@@ -53,7 +60,7 @@ interface ModuleDetailShellProps {
   /** 类型：DashboardSummaryData；含义：左侧模块统计；是否必填：是；默认值：无 */
   summary: DashboardSummaryData;
   /** 类型：PasswordListItem[] 或 FileAssetListItem[]；含义：模块列表；是否必填：是；默认值：空数组 */
-  items: PasswordListItem[] | FileAssetListItem[];
+  items: PasswordListItem[] | DocumentListItem[] | FileAssetListItem[];
   /** 类型：布尔值；含义：模块数据是否加载中；是否必填：是；默认值：false */
   loading: boolean;
   /** 类型：字符串；含义：模块加载错误提示；是否必填：否；默认值：空字符串 */
@@ -64,13 +71,22 @@ interface ModuleDetailShellProps {
   passwordOperationError?: string;
   /** 类型：数字；含义：密码保存成功信号；是否必填：否；默认值：0 */
   passwordSuccessVersion?: number;
+  /** 类型：布尔值；含义：文档增删改操作是否执行中；是否必填：否；默认值：false */
+  documentOperationLoading?: boolean;
+  /** 类型：字符串；含义：文档抽屉内操作错误提示；是否必填：否；默认值：空字符串 */
+  documentOperationError?: string;
+  /** 类型：数字；含义：文档保存成功信号；是否必填：否；默认值：0 */
+  documentSuccessVersion?: number;
 }
 
 const props = withDefaults(defineProps<ModuleDetailShellProps>(), {
   errorMessage: '',
   passwordOperationLoading: false,
   passwordOperationError: '',
-  passwordSuccessVersion: 0
+  passwordSuccessVersion: 0,
+  documentOperationLoading: false,
+  documentOperationError: '',
+  documentSuccessVersion: 0
 });
 
 const emit = defineEmits<{
@@ -80,10 +96,14 @@ const emit = defineEmits<{
   search: [keyword: string];
   savePassword: [payload: PasswordFormPayload];
   deletePassword: [id: string];
+  saveDocument: [payload: DocumentFormPayload];
+  deleteDocument: [id: string];
 }>();
 
 const keyword = ref('');
 const visiblePasswordIds = ref<Record<string, boolean>>({});
+const passwordCurrentPage = ref(1);
+const passwordPageSize = ref(5);
 const passwordDrawerVisible = ref(false);
 const passwordDrawerMode = ref<'create' | 'edit' | 'view'>('create');
 const passwordFormError = ref('');
@@ -107,6 +127,32 @@ const passwordFormRules: FormRules<PasswordFormPayload> = {
   category: [{ required: true, message: '请选择或输入分类', trigger: 'change' }]
 };
 
+const documentCurrentPage = ref(1);
+const documentPageSize = ref(5);
+const documentDrawerVisible = ref(false);
+const documentDrawerMode = ref<'create' | 'edit' | 'view'>('create');
+const documentFormError = ref('');
+const documentSubmitAttempted = ref(false);
+const documentContentLoading = ref(false);
+const documentFormRef = ref<FormInstance>();
+const documentForm = ref<DocumentFormPayload>({
+  title: '',
+  category: '',
+  fileType: 'md',
+  originalName: '',
+  content: '',
+  remark: ''
+});
+const documentCategoryOptions = ['项目文档', '技术笔记', '生活记录', '合同资料', '其他'];
+const documentFileTypeOptions: Array<{ label: string; value: DocumentFileType }> = [
+  { label: 'Markdown', value: 'md' },
+  { label: 'TXT', value: 'txt' }
+];
+const documentFormRules: FormRules<DocumentFormPayload> = {
+  title: [{ required: true, message: '请输入文档标题', trigger: 'blur' }],
+  fileType: [{ required: true, message: '请选择文档类型', trigger: 'change' }]
+};
+
 const moduleCounts = computed<Record<ArchiveModuleKey, number>>(() => ({
   passwords: props.summary.passwordCount,
   documents: props.summary.documentCount,
@@ -117,7 +163,9 @@ const moduleCounts = computed<Record<ArchiveModuleKey, number>>(() => ({
 }));
 
 const isPasswordModule = computed<boolean>(() => props.module.key === 'passwords');
+const isDocumentModule = computed<boolean>(() => props.module.key === 'documents');
 const isPasswordDrawerReadonly = computed<boolean>(() => passwordDrawerMode.value === 'view');
+const isDocumentDrawerReadonly = computed<boolean>(() => documentDrawerMode.value === 'view');
 const passwordDrawerTitle = computed<string>(() => {
   if (passwordDrawerMode.value === 'create') {
     return '新增密码';
@@ -136,6 +184,24 @@ const passwordDrawerErrorMessage = computed<string>(() => {
 
   return passwordSubmitAttempted.value ? props.passwordOperationError : '';
 });
+const documentDrawerTitle = computed<string>(() => {
+  if (documentDrawerMode.value === 'create') {
+    return '新增文档';
+  }
+
+  if (documentDrawerMode.value === 'edit') {
+    return '编辑文档';
+  }
+
+  return '查看文档';
+});
+const documentDrawerErrorMessage = computed<string>(() => {
+  if (documentFormError.value) {
+    return documentFormError.value;
+  }
+
+  return documentSubmitAttempted.value ? props.documentOperationError : '';
+});
 
 const passwordItems = computed<PasswordListItem[]>(() => {
   if (!isPasswordModule.value) {
@@ -145,8 +211,34 @@ const passwordItems = computed<PasswordListItem[]>(() => {
   return props.items as PasswordListItem[];
 });
 
+const passwordTotalPages = computed<number>(() => {
+  return Math.max(1, Math.ceil(passwordItems.value.length / passwordPageSize.value));
+});
+
+const paginatedPasswordItems = computed<PasswordListItem[]>(() => {
+  const startIndex = (passwordCurrentPage.value - 1) * passwordPageSize.value;
+  return passwordItems.value.slice(startIndex, startIndex + passwordPageSize.value);
+});
+
+const documentItems = computed<DocumentListItem[]>(() => {
+  if (!isDocumentModule.value) {
+    return [];
+  }
+
+  return props.items as DocumentListItem[];
+});
+
+const documentTotalPages = computed<number>(() => {
+  return Math.max(1, Math.ceil(documentItems.value.length / documentPageSize.value));
+});
+
+const paginatedDocumentItems = computed<DocumentListItem[]>(() => {
+  const startIndex = (documentCurrentPage.value - 1) * documentPageSize.value;
+  return documentItems.value.slice(startIndex, startIndex + documentPageSize.value);
+});
+
 const fileItems = computed<FileAssetListItem[]>(() => {
-  if (isPasswordModule.value) {
+  if (isPasswordModule.value || isDocumentModule.value) {
     return [];
   }
 
@@ -182,6 +274,8 @@ const maskPassword = (password: string | null): string => {
 };
 
 const handleSearch = (): void => {
+  passwordCurrentPage.value = 1;
+  documentCurrentPage.value = 1;
   emit('search', keyword.value);
 };
 
@@ -293,10 +387,146 @@ const getLoginUrlHost = (url: string): string => {
   }
 };
 
+const normalizeDocumentFileName = (title: string, fileType: DocumentFileType): string => {
+  const safeTitle = title.trim().replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, '-');
+  return `${safeTitle || 'document'}.${fileType}`;
+};
+
+const openCreateDocumentDrawer = (): void => {
+  documentDrawerMode.value = 'create';
+  documentFormError.value = '';
+  documentSubmitAttempted.value = false;
+  documentForm.value = {
+    title: '',
+    category: '',
+    fileType: 'md',
+    originalName: '',
+    content: '',
+    remark: ''
+  };
+  documentDrawerVisible.value = true;
+};
+
+const fillDocumentForm = (item: DocumentListItem, content = ''): void => {
+  documentForm.value = {
+    id: item.id,
+    title: item.title,
+    category: item.category || '',
+    fileType: item.fileType,
+    originalName: item.originalName,
+    content,
+    remark: item.remark || ''
+  };
+};
+
+const loadDocumentDetail = async (item: DocumentListItem): Promise<void> => {
+  documentContentLoading.value = true;
+  documentFormError.value = '';
+
+  try {
+    const response = await request<DocumentDetailData>(`/api/documents/${item.id}`);
+
+    if (!response.success) {
+      documentFormError.value = response.message;
+      return;
+    }
+
+    fillDocumentForm(response.data, response.data.content);
+  } catch (error: unknown) {
+    documentFormError.value = error instanceof Error ? error.message : '文档内容加载失败';
+    console.error(documentFormError.value);
+  } finally {
+    documentContentLoading.value = false;
+  }
+};
+
+const openEditDocumentDrawer = async (item: DocumentListItem): Promise<void> => {
+  documentDrawerMode.value = 'edit';
+  documentFormError.value = '';
+  documentSubmitAttempted.value = false;
+  fillDocumentForm(item);
+  documentDrawerVisible.value = true;
+  await loadDocumentDetail(item);
+};
+
+const openViewDocumentDrawer = async (item: DocumentListItem): Promise<void> => {
+  documentDrawerMode.value = 'view';
+  documentFormError.value = '';
+  documentSubmitAttempted.value = false;
+  fillDocumentForm(item);
+  documentDrawerVisible.value = true;
+  await loadDocumentDetail(item);
+};
+
+const closeDocumentDrawer = (): void => {
+  documentDrawerVisible.value = false;
+  documentSubmitAttempted.value = false;
+  documentContentLoading.value = false;
+};
+
+const submitDocumentForm = async (): Promise<void> => {
+  if (isDocumentDrawerReadonly.value || props.documentOperationLoading || documentContentLoading.value) {
+    return;
+  }
+
+  if (!documentFormRef.value) {
+    return;
+  }
+
+  const valid = await documentFormRef.value.validate();
+
+  if (!valid) {
+    return;
+  }
+
+  const normalizedOriginalName = documentForm.value.originalName.trim() || normalizeDocumentFileName(documentForm.value.title, documentForm.value.fileType);
+  documentFormError.value = '';
+  documentSubmitAttempted.value = true;
+  emit('saveDocument', {
+    ...documentForm.value,
+    originalName: normalizedOriginalName
+  });
+};
+
+const requestDeleteDocument = (id: string): void => {
+  if (!props.documentOperationLoading) {
+    emit('deleteDocument', id);
+  }
+};
+
 watch(
   () => props.module.key,
   () => {
     passwordDrawerVisible.value = false;
+    documentDrawerVisible.value = false;
+    passwordCurrentPage.value = 1;
+    documentCurrentPage.value = 1;
+  }
+);
+
+watch(
+  () => props.items.length,
+  () => {
+    passwordCurrentPage.value = 1;
+    documentCurrentPage.value = 1;
+  }
+);
+
+watch(
+  passwordTotalPages,
+  (totalPages) => {
+    if (passwordCurrentPage.value > totalPages) {
+      passwordCurrentPage.value = totalPages;
+    }
+  }
+);
+
+watch(
+  documentTotalPages,
+  (totalPages) => {
+    if (documentCurrentPage.value > totalPages) {
+      documentCurrentPage.value = totalPages;
+    }
   }
 );
 
@@ -305,6 +535,15 @@ watch(
   () => {
     if (passwordDrawerVisible.value && !isPasswordDrawerReadonly.value) {
       closePasswordDrawer();
+    }
+  }
+);
+
+watch(
+  () => props.documentSuccessVersion,
+  () => {
+    if (documentDrawerVisible.value && !isDocumentDrawerReadonly.value) {
+      closeDocumentDrawer();
     }
   }
 );
@@ -352,32 +591,31 @@ watch(
         </div>
       </header>
 
-      <section class="module-detail__header">
-        <div class="module-detail__intro">
-          <div class="module-detail__title-row">
-            <div>
-              <p class="module-detail__eyebrow">Module</p>
-              <h1 class="module-detail__title">{{ props.module.name }}</h1>
+      <Transition name="archive-module-content" mode="out-in">
+      <section :key="props.module.key" class="module-detail__panel module-detail__panel--workspace">
+        <div class="module-detail__workspace-head">
+          <div class="module-detail__intro">
+            <div class="module-detail__title-row">
+              <div>
+                <p class="module-detail__eyebrow">Module</p>
+                <div class="module-detail__title-stack">
+                  <h1 class="module-detail__title">{{ props.module.name }}</h1>
+                  <span class="module-detail__count-pill">{{ props.items.length }} 条记录</span>
+                </div>
+              </div>
             </div>
-            <span class="module-detail__count-pill">{{ props.items.length }} 条记录</span>
+            <p class="module-detail__description">{{ props.module.description }}</p>
           </div>
-          <p class="module-detail__description">{{ props.module.description }}</p>
-        </div>
-        <form class="module-detail__search" @submit.prevent="handleSearch">
-          <AppInput
-            v-model="keyword"
-            label="模块搜索"
-            type="search"
-            placeholder="搜索标题、分类、备注"
-          />
-          <AppButton type="submit" :loading="props.loading">搜索</AppButton>
-        </form>
-      </section>
-
-      <section class="module-detail__panel">
-        <div class="module-detail__panel-head">
-          <h2 class="module-detail__panel-title">数据列表</h2>
-          <div class="module-detail__panel-tools">
+          <div class="module-detail__workspace-tools">
+            <form class="module-detail__search" @submit.prevent="handleSearch">
+              <AppInput
+                v-model="keyword"
+                label="模块搜索"
+                type="search"
+                placeholder="搜索标题、分类、备注"
+              />
+              <AppButton type="submit" :loading="props.loading">搜索</AppButton>
+            </form>
             <AppButton
               v-if="isPasswordModule"
               variant="secondary"
@@ -386,60 +624,76 @@ watch(
               <el-icon class="module-detail__button-icon"><Plus /></el-icon>
               新增密码
             </AppButton>
-            <span class="module-detail__panel-count">{{ props.items.length }} 条</span>
+            <AppButton
+              v-if="isDocumentModule"
+              variant="secondary"
+              @click="openCreateDocumentDrawer"
+            >
+              <el-icon class="module-detail__button-icon"><Plus /></el-icon>
+              新增文档
+            </AppButton>
           </div>
         </div>
 
         <div v-if="props.errorMessage" class="module-detail__empty module-detail__empty--error">
           {{ props.errorMessage }}
         </div>
-        <div v-else-if="props.loading" class="module-detail__empty">正在加载模块数据...</div>
+        <div v-else-if="props.loading && props.items.length === 0" class="module-detail__empty">正在加载模块数据...</div>
         <div v-else-if="props.items.length === 0" class="module-detail__empty">暂无数据</div>
 
-        <div v-else-if="isPasswordModule" class="module-detail__table-wrap module-detail__table-wrap--element">
-          <el-table
-            class="module-detail__element-table"
-            :data="passwordItems"
-            border
-            :fit="true"
-            stripe
-            size="large"
-          >
-            <el-table-column prop="title" label="平台" min-width="170">
-              <template #default="{ row }: { row: PasswordListItem }">
-                <div class="module-detail__platform-cell">
-                  <strong>{{ row.title }}</strong>
-                  <el-link
-                    v-if="row.loginUrl"
-                    type="primary"
-                    :href="row.loginUrl"
-                    target="_blank"
-                    :underline="false"
-                  >
-                    <el-icon><Link /></el-icon>
-                    {{ getLoginUrlHost(row.loginUrl) }}
-                  </el-link>
-                  <span v-else>{{ row.updatedAt }}</span>
-                </div>
-              </template>
-            </el-table-column>
+        <template v-else-if="isPasswordModule">
+          <div class="module-detail__table-wrap module-detail__table-wrap--element">
+            <el-table
+              class="module-detail__element-table"
+              :data="paginatedPasswordItems"
+              border
+              :fit="false"
+              stripe
+              size="large"
+            >
+              <el-table-column prop="title" label="平台" width="220" fixed="left">
+                <template #default="{ row }: { row: PasswordListItem }">
+                  <div class="module-detail__platform-cell">
+                    <span class="module-detail__platform-title">{{ row.title }}</span>
+                  </div>
+                </template>
+              </el-table-column>
 
-            <el-table-column prop="category" label="分类" width="84">
+              <el-table-column prop="category" label="分类" width="120">
               <template #default="{ row }: { row: PasswordListItem }">
                 <el-tag effect="plain" round>{{ row.category }}</el-tag>
               </template>
-            </el-table-column>
+              </el-table-column>
 
-            <el-table-column label="登录信息" min-width="150" show-overflow-tooltip>
+              <el-table-column prop="loginUrl" label="登录网址" width="220" show-overflow-tooltip>
               <template #default="{ row }: { row: PasswordListItem }">
-                <div class="module-detail__login-cell">
-                  <strong>{{ row.account || '-' }}</strong>
-                  <span>{{ row.loginMethod || '未填写登录方式' }}</span>
-                </div>
+                <el-link
+                  v-if="row.loginUrl"
+                  type="primary"
+                  :href="row.loginUrl"
+                  target="_blank"
+                  :underline="false"
+                >
+                  <el-icon><Link /></el-icon>
+                  {{ row.loginUrl }}
+                </el-link>
+                <span v-else>-</span>
               </template>
-            </el-table-column>
+              </el-table-column>
 
-            <el-table-column prop="password" label="密码" min-width="124">
+              <el-table-column prop="loginMethod" label="登录方式" width="130">
+              <template #default="{ row }: { row: PasswordListItem }">
+                {{ row.loginMethod || '-' }}
+              </template>
+              </el-table-column>
+
+              <el-table-column prop="account" label="账号" width="210" show-overflow-tooltip>
+              <template #default="{ row }: { row: PasswordListItem }">
+                {{ row.account || '-' }}
+              </template>
+              </el-table-column>
+
+              <el-table-column prop="password" label="密码" width="170">
               <template #default="{ row }: { row: PasswordListItem }">
                 <span class="module-detail__password-cell">
                   <code>{{ getPasswordDisplayText(row) }}</code>
@@ -459,21 +713,21 @@ watch(
                   </el-tooltip>
                 </span>
               </template>
-            </el-table-column>
+              </el-table-column>
 
-            <el-table-column label="绑定信息" min-width="130" show-overflow-tooltip>
+              <el-table-column label="绑定信息" width="220" show-overflow-tooltip>
               <template #default="{ row }: { row: PasswordListItem }">
                 {{ getBindingText(row) }}
               </template>
-            </el-table-column>
+              </el-table-column>
 
-            <el-table-column prop="remark" min-width="120" show-overflow-tooltip>
+              <el-table-column prop="remark" label="备注" width="220" show-overflow-tooltip>
               <template #default="{ row }: { row: PasswordListItem }">
                 {{ row.remark || '-' }}
               </template>
-            </el-table-column>
+              </el-table-column>
 
-            <el-table-column label="操作" width="190" fixed="right" align="right" header-align="right">
+              <el-table-column label="操作" width="210" fixed="right" align="left" header-align="left">
               <template #default="{ row }: { row: PasswordListItem }">
                 <div class="module-detail__element-actions">
                   <el-button text type="primary" @click="openViewPasswordDrawer(row)">
@@ -503,9 +757,100 @@ watch(
                   </el-popconfirm>
                 </div>
               </template>
-            </el-table-column>
-          </el-table>
-        </div>
+              </el-table-column>
+            </el-table>
+          </div>
+
+          <div class="module-detail__pagination">
+            <el-pagination
+              v-model:current-page="passwordCurrentPage"
+              v-model:page-size="passwordPageSize"
+              :page-sizes="[5, 10, 20, 50]"
+              :total="passwordItems.length"
+              background
+              layout="total, sizes, prev, pager, next"
+            />
+          </div>
+        </template>
+
+        <template v-else-if="isDocumentModule">
+          <div class="module-detail__table-wrap module-detail__table-wrap--element">
+            <el-table
+              class="module-detail__element-table"
+              :data="paginatedDocumentItems"
+              border
+              :fit="false"
+              stripe
+              size="large"
+            >
+              <el-table-column prop="title" label="文档标题" width="220" fixed="left" show-overflow-tooltip />
+              <el-table-column prop="category" label="分类" width="120">
+                <template #default="{ row }: { row: DocumentListItem }">
+                  <el-tag effect="plain" round>{{ row.category || '未分类' }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="fileType" label="类型" width="100">
+                <template #default="{ row }: { row: DocumentListItem }">
+                  <el-tag effect="plain" round>{{ row.fileType.toUpperCase() }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="originalName" label="文件名" width="190" show-overflow-tooltip />
+              <el-table-column prop="size" label="大小" width="100">
+                <template #default="{ row }: { row: DocumentListItem }">
+                  {{ formatSize(row.size) }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="remark" label="备注" width="220" show-overflow-tooltip>
+                <template #default="{ row }: { row: DocumentListItem }">
+                  {{ row.remark || '-' }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="updatedAt" label="更新时间" width="170" show-overflow-tooltip />
+              <el-table-column label="操作" width="210" fixed="right" align="left" header-align="left">
+                <template #default="{ row }: { row: DocumentListItem }">
+                  <div class="module-detail__element-actions">
+                    <el-button text type="primary" @click="openViewDocumentDrawer(row)">
+                      查看
+                    </el-button>
+                    <el-button text type="primary" :icon="EditPen" @click="openEditDocumentDrawer(row)">
+                      编辑
+                    </el-button>
+                    <el-popconfirm
+                      width="220"
+                      title="确认删除这篇文档？"
+                      confirm-button-text="删除"
+                      cancel-button-text="取消"
+                      confirm-button-type="danger"
+                      @confirm="requestDeleteDocument(row.id)"
+                    >
+                      <template #reference>
+                        <el-button
+                          text
+                          type="danger"
+                          :icon="Delete"
+                          :loading="props.documentOperationLoading"
+                        >
+                          删除
+                        </el-button>
+                      </template>
+                    </el-popconfirm>
+                  </div>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+
+          <div class="module-detail__pagination">
+            <el-pagination
+              v-model:current-page="documentCurrentPage"
+              v-model:page-size="documentPageSize"
+              :page-sizes="[5, 10, 20, 50]"
+              :total="documentItems.length"
+              background
+              layout="total, sizes, prev, pager, next"
+            />
+          </div>
+        </template>
 
         <TransitionGroup v-else name="archive-row" tag="div" class="module-detail__file-list">
           <article v-for="item in fileItems" :key="item.id" class="module-detail__file-row">
@@ -525,13 +870,14 @@ watch(
           </article>
         </TransitionGroup>
       </section>
+      </Transition>
     </main>
 
     <el-drawer
       v-model="passwordDrawerVisible"
       class="module-detail__element-drawer"
       direction="rtl"
-      size="520px"
+      size="450px"
       :close-on-click-modal="!props.passwordOperationLoading"
       :close-on-press-escape="!props.passwordOperationLoading"
       :show-close="false"
@@ -544,7 +890,7 @@ watch(
             <h2 class="module-detail__drawer-title">{{ passwordDrawerTitle }}</h2>
           </div>
           <el-button circle text aria-label="关闭抽屉" @click="closePasswordDrawer">
-            <el-icon><Hide /></el-icon>
+            <el-icon><Close /></el-icon>
           </el-button>
         </header>
       </template>
@@ -558,11 +904,11 @@ watch(
         hide-required-asterisk
         @submit.prevent="submitPasswordForm"
       >
-        <el-form-item label="平台名称" prop="title">
+        <el-form-item class="module-detail__drawer-item" label="平台名称" prop="title">
           <el-input v-model="passwordForm.title" placeholder="例如：阿里云控制台" :disabled="isPasswordDrawerReadonly" clearable />
         </el-form-item>
 
-        <el-form-item label="分类" prop="category">
+        <el-form-item class="module-detail__drawer-item" label="分类" prop="category">
           <el-select
             v-model="passwordForm.category"
             placeholder="选择或输入分类"
@@ -580,11 +926,11 @@ watch(
           </el-select>
         </el-form-item>
 
-        <el-form-item label="登录网址" prop="loginUrl">
+        <el-form-item class="module-detail__drawer-item" label="登录网址" prop="loginUrl">
           <el-input v-model="passwordForm.loginUrl" placeholder="https://example.com" :disabled="isPasswordDrawerReadonly" clearable />
         </el-form-item>
 
-        <el-form-item label="登录方式" prop="loginMethod">
+        <el-form-item class="module-detail__drawer-item" label="登录方式" prop="loginMethod">
           <el-select
             v-model="passwordForm.loginMethod"
             placeholder="选择或输入登录方式"
@@ -603,11 +949,11 @@ watch(
           </el-select>
         </el-form-item>
 
-        <el-form-item label="登录账号" prop="account">
+        <el-form-item class="module-detail__drawer-item" label="登录账号" prop="account">
           <el-input v-model="passwordForm.account" placeholder="账号、手机号、邮箱或微信号" :disabled="isPasswordDrawerReadonly" clearable />
         </el-form-item>
 
-        <el-form-item label="登录密码" prop="password">
+        <el-form-item class="module-detail__drawer-item" label="登录密码" prop="password">
           <el-input
             v-model="passwordForm.password"
             placeholder="明文保存，仅个人查看"
@@ -617,15 +963,15 @@ watch(
           />
         </el-form-item>
 
-        <el-form-item label="绑定手机号" prop="phone">
+        <el-form-item class="module-detail__drawer-item" label="绑定手机号" prop="phone">
           <el-input v-model="passwordForm.phone" placeholder="可选" :disabled="isPasswordDrawerReadonly" clearable />
         </el-form-item>
 
-        <el-form-item label="绑定邮箱" prop="email">
+        <el-form-item class="module-detail__drawer-item" label="绑定邮箱" prop="email">
           <el-input v-model="passwordForm.email" placeholder="可选" :disabled="isPasswordDrawerReadonly" clearable />
         </el-form-item>
 
-        <el-form-item label="备注" prop="remark">
+        <el-form-item class="module-detail__drawer-item module-detail__drawer-item--full" label="备注" prop="remark">
           <el-input
             v-model="passwordForm.remark"
             placeholder="补充说明"
@@ -637,6 +983,7 @@ watch(
 
         <el-alert
           v-if="passwordDrawerErrorMessage"
+          class="module-detail__drawer-alert"
           :title="passwordDrawerErrorMessage"
           type="error"
           show-icon
@@ -654,6 +1001,126 @@ watch(
             @click="submitPasswordForm"
           >
             {{ passwordDrawerMode === 'create' ? '新增' : '保存' }}
+          </el-button>
+        </div>
+      </template>
+    </el-drawer>
+
+    <el-drawer
+      v-model="documentDrawerVisible"
+      class="module-detail__element-drawer"
+      direction="rtl"
+      size="450px"
+      :close-on-click-modal="!props.documentOperationLoading"
+      :close-on-press-escape="!props.documentOperationLoading"
+      :show-close="false"
+      destroy-on-close
+    >
+      <template #header>
+        <header class="module-detail__drawer-head">
+          <div>
+            <p class="module-detail__drawer-eyebrow">Document</p>
+            <h2 class="module-detail__drawer-title">{{ documentDrawerTitle }}</h2>
+          </div>
+          <el-button circle text aria-label="关闭抽屉" @click="closeDocumentDrawer">
+            <el-icon><Close /></el-icon>
+          </el-button>
+        </header>
+      </template>
+
+      <el-form
+        ref="documentFormRef"
+        class="module-detail__drawer-form module-detail__drawer-form--element"
+        :model="documentForm"
+        :rules="documentFormRules"
+        label-position="top"
+        hide-required-asterisk
+        @submit.prevent="submitDocumentForm"
+      >
+        <el-form-item class="module-detail__drawer-item" label="文档标题" prop="title">
+          <el-input v-model="documentForm.title" placeholder="例如：部署笔记" :disabled="isDocumentDrawerReadonly" clearable />
+        </el-form-item>
+
+        <el-form-item class="module-detail__drawer-item" label="分类" prop="category">
+          <el-select
+            v-model="documentForm.category"
+            placeholder="选择或输入分类"
+            filterable
+            allow-create
+            default-first-option
+            :disabled="isDocumentDrawerReadonly"
+            clearable
+          >
+            <el-option
+              v-for="category in documentCategoryOptions"
+              :key="category"
+              :label="category"
+              :value="category"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item class="module-detail__drawer-item" label="文档类型" prop="fileType">
+          <el-select v-model="documentForm.fileType" :disabled="isDocumentDrawerReadonly">
+            <el-option
+              v-for="option in documentFileTypeOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item class="module-detail__drawer-item" label="文件名" prop="originalName">
+          <el-input
+            v-model="documentForm.originalName"
+            placeholder="不填则按标题生成"
+            :disabled="isDocumentDrawerReadonly"
+            clearable
+          />
+        </el-form-item>
+
+        <el-form-item class="module-detail__drawer-item module-detail__drawer-item--full" label="内容" prop="content">
+          <el-input
+            v-model="documentForm.content"
+            class="module-detail__document-editor"
+            :placeholder="documentContentLoading ? '正在加载文档内容...' : '在这里编写 Markdown 或 TXT 内容'"
+            type="textarea"
+            :autosize="{ minRows: 12, maxRows: 18 }"
+            :disabled="isDocumentDrawerReadonly || documentContentLoading"
+          />
+        </el-form-item>
+
+        <el-form-item class="module-detail__drawer-item module-detail__drawer-item--full" label="备注" prop="remark">
+          <el-input
+            v-model="documentForm.remark"
+            placeholder="补充说明"
+            type="textarea"
+            :autosize="{ minRows: 3, maxRows: 5 }"
+            :disabled="isDocumentDrawerReadonly"
+          />
+        </el-form-item>
+
+        <el-alert
+          v-if="documentDrawerErrorMessage"
+          class="module-detail__drawer-alert"
+          :title="documentDrawerErrorMessage"
+          type="error"
+          show-icon
+          :closable="false"
+        />
+      </el-form>
+
+      <template #footer>
+        <div class="module-detail__drawer-actions">
+          <el-button @click="closeDocumentDrawer">取消</el-button>
+          <el-button
+            v-if="!isDocumentDrawerReadonly"
+            type="primary"
+            :loading="props.documentOperationLoading || documentContentLoading"
+            @click="submitDocumentForm"
+          >
+            {{ documentDrawerMode === 'create' ? '新增' : '保存' }}
           </el-button>
         </div>
       </template>

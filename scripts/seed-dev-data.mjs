@@ -4,13 +4,14 @@
  * 关键布局说明：不涉及布局
  */
 
+import bcrypt from 'bcryptjs';
 import Database from 'better-sqlite3';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 const databasePath = resolve(process.env.NUXT_DATABASE_PATH || './data/archive.db');
 const uploadsDir = resolve(process.env.NUXT_UPLOADS_DIR || './uploads');
-const userId = process.env.NUXT_OWNER_USER_ID || 'owner';
+const profileId = 'demo';
 
 /**
  * 初始化脚本需要的数据库表
@@ -24,6 +25,15 @@ const initializeDatabase = (database) => {
     CREATE TABLE IF NOT EXISTS app_settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- 档案配置表：不同密码进入不同档案空间
+    CREATE TABLE IF NOT EXISTS archive_profiles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -80,6 +90,38 @@ const writeSampleFile = (storagePath, content) => {
   return Buffer.byteLength(content, 'utf8');
 };
 
+/**
+ * 初始化默认档案密码
+ * @param {import('better-sqlite3').Database} database - SQLite 数据库连接
+ * @returns {void}
+ * @throws 当写入失败时抛出错误
+ */
+const seedProfiles = (database) => {
+  const personalPassword = process.env.NUXT_PERSONAL_ARCHIVE_PASSWORD || 'xinjie123';
+  const demoPassword = process.env.NUXT_DEMO_ARCHIVE_PASSWORD || '123456';
+  const insertProfile = database.prepare(`
+    INSERT INTO archive_profiles (id, name, password_hash, created_at, updated_at)
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO NOTHING
+  `);
+  const updateProfilePassword = database.prepare(`
+    UPDATE archive_profiles
+    SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+
+  insertProfile.run('personal', '个人档案', bcrypt.hashSync(personalPassword, 12));
+  insertProfile.run('demo', '演示档案', bcrypt.hashSync(demoPassword, 12));
+
+  if (process.env.NUXT_PERSONAL_ARCHIVE_PASSWORD) {
+    updateProfilePassword.run(bcrypt.hashSync(personalPassword, 12), 'personal');
+  }
+
+  if (process.env.NUXT_DEMO_ARCHIVE_PASSWORD) {
+    updateProfilePassword.run(bcrypt.hashSync(demoPassword, 12), 'demo');
+  }
+};
+
 const passwordItems = [
   ['seed-password-csdn', 'CSDN 博客', '开发平台', 'https://www.csdn.net', '手机号', '13800000001', 'Archive@csdn2026', '13800000001', 'dev@example.com', '技术文章和评论账号'],
   ['seed-password-aliyun', '阿里云控制台', '阿里系', 'https://ecs.console.aliyun.com', '邮箱', 'archive@example.com', 'Aliyun@demo2026', '13800000002', 'archive@example.com', 'ECS 和域名控制台'],
@@ -96,7 +138,7 @@ const fileAssets = [
     category: '项目文档',
     title: 'Nuxt 4 部署笔记',
     originalName: 'nuxt-deploy.md',
-    storagePath: 'documents/nuxt-deploy.md',
+    storagePath: 'demo/documents/nuxt-deploy.md',
     mimeType: 'text/markdown',
     remark: 'Nuxt 部署到阿里云 ECS 的步骤记录',
     content: '# Nuxt 4 部署笔记\n\n- 使用 PM2 单实例运行\n- SQLite 放在 ECS 数据盘\n- Nginx 反向代理到 Nuxt 服务\n'
@@ -107,7 +149,7 @@ const fileAssets = [
     category: '数据库',
     title: 'SQLite 使用说明',
     originalName: 'sqlite-note.md',
-    storagePath: 'documents/sqlite-note.md',
+    storagePath: 'demo/documents/sqlite-note.md',
     mimeType: 'text/markdown',
     remark: '个人项目 SQLite 使用注意事项',
     content: '# SQLite 使用说明\n\nSQLite 适合单人低并发场景，数据库文件建议放在本地云盘。\n'
@@ -118,7 +160,7 @@ const fileAssets = [
     category: 'Java 后端',
     title: 'Java 后端简历',
     originalName: 'java-backend-resume.md',
-    storagePath: 'resumes/java-backend-resume.md',
+    storagePath: 'demo/resumes/java-backend-resume.md',
     mimeType: 'text/markdown',
     remark: '模拟简历文件，后续可替换为 docx 或 pdf',
     content: '# Java 后端简历\n\n姓名：示例\n方向：Java 后端开发\n'
@@ -129,7 +171,7 @@ const fileAssets = [
     category: '通用',
     title: '通用中文简历',
     originalName: 'common-resume.md',
-    storagePath: 'resumes/common-resume.md',
+    storagePath: 'demo/resumes/common-resume.md',
     mimeType: 'text/markdown',
     remark: '通用投递版本',
     content: '# 通用中文简历\n\n这是开发环境示例文件。\n'
@@ -140,7 +182,7 @@ const fileAssets = [
     category: '证件照',
     title: '蓝底证件照',
     originalName: 'id-photo.txt',
-    storagePath: 'images/id-photo.txt',
+    storagePath: 'demo/images/id-photo.txt',
     mimeType: 'text/plain',
     remark: '占位文件，真实项目中替换为图片',
     content: '这是证件照占位文件，后续上传真实图片。\n'
@@ -151,7 +193,7 @@ const fileAssets = [
     category: '生活照',
     title: '生活照精选',
     originalName: 'life-photo.txt',
-    storagePath: 'images/life-photo.txt',
+    storagePath: 'demo/images/life-photo.txt',
     mimeType: 'text/plain',
     remark: '占位文件，真实项目中替换为图片',
     content: '这是生活照占位文件，后续上传真实图片。\n'
@@ -162,7 +204,7 @@ const fileAssets = [
     category: '身份证',
     title: '身份证正反面',
     originalName: 'id-card.txt',
-    storagePath: 'certificates/id-card.txt',
+    storagePath: 'demo/certificates/id-card.txt',
     mimeType: 'text/plain',
     remark: '占位文件，真实项目中替换为证件截图',
     content: '这是身份证占位文件，后续上传真实证件图片。\n'
@@ -173,7 +215,7 @@ const fileAssets = [
     category: '学历证明',
     title: '学位证书',
     originalName: 'degree.txt',
-    storagePath: 'certificates/degree.txt',
+    storagePath: 'demo/certificates/degree.txt',
     mimeType: 'text/plain',
     remark: '占位文件，真实项目中替换为证书扫描件',
     content: '这是学位证书占位文件，后续上传真实扫描件。\n'
@@ -184,7 +226,7 @@ const fileAssets = [
     category: '前端',
     title: 'Vue 学习资料',
     originalName: 'vue-study.md',
-    storagePath: 'study/vue-study.md',
+    storagePath: 'demo/study/vue-study.md',
     mimeType: 'text/markdown',
     remark: 'Vue 和 Nuxt 学习资料索引',
     content: '# Vue 学习资料\n\n- Composition API\n- Nuxt 4\n- SCSS 组件化\n'
@@ -195,7 +237,7 @@ const fileAssets = [
     category: '数据库',
     title: '数据库复习资料',
     originalName: 'database-study.md',
-    storagePath: 'study/database-study.md',
+    storagePath: 'demo/study/database-study.md',
     mimeType: 'text/markdown',
     remark: 'SQLite 和 SQL 基础复习',
     content: '# 数据库复习资料\n\n- 参数化查询\n- 索引\n- 事务\n'
@@ -209,6 +251,7 @@ const database = new Database(databasePath);
 database.pragma('journal_mode = WAL');
 database.pragma('foreign_keys = ON');
 initializeDatabase(database);
+seedProfiles(database);
 
 const insertPassword = database.prepare(`
   INSERT INTO password_items (
@@ -216,6 +259,7 @@ const insertPassword = database.prepare(`
   )
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
   ON CONFLICT(id) DO UPDATE SET
+    user_id = excluded.user_id,
     title = excluded.title,
     category = excluded.category,
     login_url = excluded.login_url,
@@ -234,6 +278,7 @@ const insertFileAsset = database.prepare(`
   )
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
   ON CONFLICT(id) DO UPDATE SET
+    user_id = excluded.user_id,
     module = excluded.module,
     category = excluded.category,
     title = excluded.title,
@@ -247,14 +292,14 @@ const insertFileAsset = database.prepare(`
 
 const seedTransaction = database.transaction(() => {
   for (const item of passwordItems) {
-    insertPassword.run(item[0], userId, item[1], item[2], item[3], item[4], item[5], item[6], item[7], item[8], item[9]);
+    insertPassword.run(item[0], profileId, item[1], item[2], item[3], item[4], item[5], item[6], item[7], item[8], item[9]);
   }
 
   for (const item of fileAssets) {
     const size = writeSampleFile(item.storagePath, item.content);
     insertFileAsset.run(
       item.id,
-      userId,
+      profileId,
       item.module,
       item.category,
       item.title,

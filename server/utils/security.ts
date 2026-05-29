@@ -15,7 +15,7 @@ import {
   setCookie,
   type H3Event
 } from 'h3';
-import { getSetting } from './database';
+import { getSetting, listArchiveProfiles } from './database';
 
 const MASTER_PASSWORD_KEY = 'master_password_hash';
 const SESSION_COOKIE_NAME = 'archive_session';
@@ -23,6 +23,13 @@ const CSRF_COOKIE_NAME = 'archive_csrf';
 const SESSION_TTL_SECONDS = 60 * 60 * 8;
 
 let developmentSessionSecret: string | null = null;
+
+export interface ArchiveSession {
+  /** 类型：字符串；含义：当前档案标识；是否必填：是；默认值：无 */
+  profileId: string;
+  /** 类型：字符串；含义：当前档案名称；是否必填：是；默认值：无 */
+  profileName: string;
+}
 
 /**
  * 获取当前环境是否为生产环境
@@ -132,7 +139,7 @@ export const verifyPassword = async (password: string, hashedPassword: string): 
  * @throws 当数据库查询失败时抛出异常
  */
 export const hasMasterPassword = (): boolean => {
-  return Boolean(getSetting(MASTER_PASSWORD_KEY));
+  return listArchiveProfiles().length > 0 || Boolean(getSetting(MASTER_PASSWORD_KEY));
 };
 
 /**
@@ -153,13 +160,13 @@ export const getMasterPasswordSettingKey = (): string => MASTER_PASSWORD_KEY;
 
 /**
  * 创建签名会话令牌
- * @param userId - 用户标识
+ * @param profile - 档案会话
  * @returns 签名后的会话令牌
  * @throws 当签名失败时抛出异常
  */
-export const createSessionToken = (userId: string): string => {
+export const createSessionToken = (profile: ArchiveSession): string => {
   const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
-  const payload = Buffer.from(JSON.stringify({ userId, expiresAt })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({ ...profile, expiresAt })).toString('base64url');
   const signature = createHmac('sha256', getSessionSecret()).update(payload).digest('base64url');
   return `${payload}.${signature}`;
 };
@@ -167,10 +174,10 @@ export const createSessionToken = (userId: string): string => {
 /**
  * 校验会话令牌
  * @param token - 会话令牌
- * @returns 用户标识，校验失败时返回 null
+ * @returns 档案会话，校验失败时返回 null
  * @throws 不抛出异常
  */
-export const verifySessionToken = (token: string | undefined): string | null => {
+export const verifySessionToken = (token: string | undefined): ArchiveSession | null => {
   if (!token) {
     return null;
   }
@@ -192,10 +199,12 @@ export const verifySessionToken = (token: string | undefined): string | null => 
   try {
     const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
       userId?: unknown;
+      profileId?: unknown;
+      profileName?: unknown;
       expiresAt?: unknown;
     };
 
-    if (typeof decoded.userId !== 'string' || typeof decoded.expiresAt !== 'number') {
+    if (typeof decoded.expiresAt !== 'number') {
       return null;
     }
 
@@ -203,7 +212,21 @@ export const verifySessionToken = (token: string | undefined): string | null => 
       return null;
     }
 
-    return decoded.userId;
+    if (typeof decoded.profileId === 'string' && typeof decoded.profileName === 'string') {
+      return {
+        profileId: decoded.profileId,
+        profileName: decoded.profileName
+      };
+    }
+
+    if (typeof decoded.userId === 'string') {
+      return {
+        profileId: decoded.userId,
+        profileName: decoded.userId === 'demo' ? '演示档案' : '个人档案'
+      };
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -212,12 +235,12 @@ export const verifySessionToken = (token: string | undefined): string | null => 
 /**
  * 写入会话 Cookie
  * @param event - H3 请求事件
- * @param userId - 用户标识
+ * @param profile - 档案会话
  * @returns 无返回值
  * @throws 当签名失败时抛出异常
  */
-export const setSessionCookie = (event: H3Event, userId: string): void => {
-  setCookie(event, SESSION_COOKIE_NAME, createSessionToken(userId), {
+export const setSessionCookie = (event: H3Event, profile: ArchiveSession): void => {
+  setCookie(event, SESSION_COOKIE_NAME, createSessionToken(profile), {
     httpOnly: true,
     maxAge: SESSION_TTL_SECONDS,
     path: '/',
@@ -245,26 +268,50 @@ export const clearSessionCookie = (event: H3Event): void => {
 /**
  * 判断请求是否已经解锁
  * @param event - H3 请求事件
- * @param userId - 用户标识
  * @returns 是否已解锁
  * @throws 不抛出异常
  */
-export const isAuthenticated = (event: H3Event, userId: string): boolean => {
-  const sessionUserId = verifySessionToken(getCookie(event, SESSION_COOKIE_NAME));
-  return sessionUserId === userId;
+export const isAuthenticated = (event: H3Event): boolean => {
+  return Boolean(verifySessionToken(getCookie(event, SESSION_COOKIE_NAME)));
 };
 
 /**
  * 断言请求已经解锁
  * @param event - H3 请求事件
- * @param userId - 用户标识
- * @returns 无返回值
+ * @returns 当前档案会话
  * @throws 当未解锁时抛出异常
  */
-export const assertAuthenticated = (event: H3Event, userId: string): void => {
-  if (!isAuthenticated(event, userId)) {
-    throw new Error('请先输入个人密码');
+export const assertAuthenticated = (event: H3Event): ArchiveSession => {
+  const session = verifySessionToken(getCookie(event, SESSION_COOKIE_NAME));
+
+  if (!session) {
+    throw new Error('请先输入档案密码');
   }
+
+  return session;
+};
+
+/**
+ * 按密码匹配档案
+ * @param password - 用户输入的档案密码
+ * @returns 匹配到的档案会话，未匹配时返回 null
+ * @throws 当密码校验失败时抛出异常
+ */
+export const matchArchiveProfileByPassword = async (password: string): Promise<ArchiveSession | null> => {
+  const profiles = listArchiveProfiles();
+
+  for (const profile of profiles) {
+    const matched = await verifyPassword(password, profile.password_hash);
+
+    if (matched) {
+      return {
+        profileId: profile.id,
+        profileName: profile.name
+      };
+    }
+  }
+
+  return null;
 };
 
 /**

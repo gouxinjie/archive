@@ -2,20 +2,13 @@
  * 手动锁定个人档案接口
  */
 
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler } from 'h3';
 import { createErrorResponse, createSuccessResponse, getErrorMessage } from '../../utils/apiResponse';
-import { assertCsrfToken, assertValidUserId, clearSessionCookie } from '../../utils/security';
-
-interface LockRequestBody {
-  userId?: unknown;
-}
+import { assertCsrfToken, clearSessionCookie } from '../../utils/security';
 
 export default defineEventHandler(async (event) => {
   try {
     assertCsrfToken(event);
-
-    const body = await readBody<LockRequestBody>(event);
-    assertValidUserId(body.userId);
     clearSessionCookie(event);
 
     return createSuccessResponse(null, '已锁定');

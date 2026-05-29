@@ -33,7 +33,7 @@ const emit = defineEmits<{
 const password = ref('');
 const localError = ref('');
 
-const title = computed<string>(() => (props.needsSetup ? '设置个人密码' : '输入个人密码'));
+const title = computed<string>(() => (props.needsSetup ? '设置个人密码' : '输入档案密码'));
 const buttonText = computed<string>(() => (props.needsSetup ? '创建并进入' : '进入档案'));
 const visibleError = computed<string>(() => localError.value || props.errorMessage);
 
@@ -41,7 +41,7 @@ const submit = (): void => {
   localError.value = '';
 
   if (password.value.trim().length < 6) {
-    localError.value = '个人密码至少需要 6 位';
+    localError.value = '档案密码至少需要 6 位';
     return;
   }
 
@@ -70,9 +70,12 @@ const submit = (): void => {
           v-model="password"
           :label="title"
           type="password"
-          placeholder="请输入你的个人密码"
+          placeholder="输入档案密码后直接进入对应档案"
           :error="visibleError"
         />
+        <p v-if="!props.needsSetup" class="entry-gate__demo-tip">
+          演示档案密码：<strong>123456</strong>
+        </p>
         <AppButton type="submit" :loading="props.loading">{{ buttonText }}</AppButton>
       </form>
     </section>

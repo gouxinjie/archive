@@ -27,6 +27,10 @@ export interface AuthStatusData {
   hasPassword: boolean;
   /** 类型：布尔值；含义：当前访问是否已解锁；是否必填：是；默认值：false */
   authenticated: boolean;
+  /** 类型：字符串或 null；含义：当前档案标识；是否必填：否；默认值：null */
+  profileId?: string | null;
+  /** 类型：字符串或 null；含义：当前档案名称；是否必填：否；默认值：null */
+  profileName?: string | null;
 }
 
 export interface CsrfTokenData {

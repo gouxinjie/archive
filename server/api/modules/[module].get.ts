@@ -4,10 +4,11 @@
 
 import { defineEventHandler, getQuery, getRouterParam } from 'h3';
 import { ARCHIVE_MODULES } from '../../../src/constants/app';
-import type { ArchiveModuleKey, FileAssetListItem, ModuleDetailData, PasswordListItem } from '../../../src/types/models';
+import type { ArchiveModuleKey, DocumentListItem, FileAssetListItem, ModuleDetailData, PasswordListItem } from '../../../src/types/models';
 import { createErrorResponse, createSuccessResponse, getErrorMessage } from '../../utils/apiResponse';
 import { listFileAssets, listPasswordItems } from '../../utils/database';
-import { assertAuthenticated, assertQueryUserId } from '../../utils/security';
+import { getDocumentFileMeta } from '../../utils/documentStorage';
+import { assertAuthenticated } from '../../utils/security';
 
 const moduleKeys = new Set<string>(ARCHIVE_MODULES.map((item) => item.key));
 
@@ -33,8 +34,8 @@ const normalizeKeyword = (value: unknown): string => {
 
 export default defineEventHandler((event) => {
   try {
-    const userId = assertQueryUserId(event);
-    assertAuthenticated(event, userId);
+    const session = assertAuthenticated(event);
+    const profileId = session.profileId;
 
     const moduleKey = getRouterParam(event, 'module');
 
@@ -51,7 +52,7 @@ export default defineEventHandler((event) => {
     }
 
     if (moduleKey === 'passwords') {
-      const items: PasswordListItem[] = listPasswordItems(userId, keyword).map((item) => ({
+      const items: PasswordListItem[] = listPasswordItems(profileId, keyword).map((item) => ({
         id: item.id,
         title: item.title,
         category: item.category,
@@ -71,7 +72,32 @@ export default defineEventHandler((event) => {
       });
     }
 
-    const items: FileAssetListItem[] = listFileAssets(userId, moduleKey, keyword).map((item) => ({
+    if (moduleKey === 'documents') {
+      const items: DocumentListItem[] = listFileAssets(profileId, moduleKey, keyword).map((item) => {
+        const documentMeta = getDocumentFileMeta(item);
+
+        return {
+          id: item.id,
+          module: item.module as ArchiveModuleKey,
+          category: item.category,
+          title: item.title,
+          originalName: item.original_name,
+          storagePath: item.storage_path,
+          mimeType: documentMeta.mimeType,
+          size: item.size,
+          remark: item.remark,
+          updatedAt: item.updated_at,
+          fileType: documentMeta.fileType
+        };
+      });
+
+      return createSuccessResponse<ModuleDetailData>({
+        module: moduleConfig,
+        items
+      });
+    }
+
+    const items: FileAssetListItem[] = listFileAssets(profileId, moduleKey, keyword).map((item) => ({
       id: item.id,
       module: item.module as ArchiveModuleKey,
       category: item.category,

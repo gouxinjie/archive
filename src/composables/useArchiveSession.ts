@@ -21,7 +21,9 @@ interface UnlockResult {
 export const useArchiveSession = () => {
   const status = useState<AuthStatusData>('archive-session-status', () => ({
     hasPassword: false,
-    authenticated: false
+    authenticated: false,
+    profileId: null,
+    profileName: null
   }));
   const loading = useState<boolean>('archive-session-loading', () => false);
   const initialized = useState<boolean>('archive-session-initialized', () => false);
@@ -74,7 +76,7 @@ export const useArchiveSession = () => {
     errorMessage.value = '';
 
     try {
-      const response: ApiResponse<null> = await request<null>(url, {
+      const response: ApiResponse<unknown> = await request<unknown>(url, {
         method: 'POST',
         body: { password }
       });

@@ -2,14 +2,10 @@
  * 删除密码记录接口
  */
 
-import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import { defineEventHandler, getRouterParam } from 'h3';
 import { createErrorResponse, createSuccessResponse, getErrorMessage } from '../../utils/apiResponse';
 import { deletePasswordItem } from '../../utils/database';
-import { assertAuthenticated, assertCsrfToken, assertValidUserId } from '../../utils/security';
-
-interface DeletePasswordRequestBody {
-  userId?: unknown;
-}
+import { assertAuthenticated, assertCsrfToken } from '../../utils/security';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -21,11 +17,9 @@ export default defineEventHandler(async (event) => {
       return createErrorResponse('PASSWORD_ID_REQUIRED', '密码记录标识不能为空');
     }
 
-    const body = await readBody<DeletePasswordRequestBody>(event);
-    const userId = assertValidUserId(body.userId);
-    assertAuthenticated(event, userId);
+    const session = assertAuthenticated(event);
 
-    const deleted = deletePasswordItem(id, userId);
+    const deleted = deletePasswordItem(id, session.profileId);
 
     if (!deleted) {
       return createErrorResponse('PASSWORD_NOT_FOUND', '密码记录不存在');

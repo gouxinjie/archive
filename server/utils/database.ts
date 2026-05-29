@@ -2,6 +2,7 @@
  * SQLite 数据库连接和初始化工具
  */
 
+import bcrypt from 'bcryptjs';
 import Database from 'better-sqlite3';
 import type { Database as DatabaseConnection } from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
@@ -15,6 +16,12 @@ interface CountRow {
 
 interface TableColumnRow {
   name: string;
+}
+
+export interface ArchiveProfileRow {
+  id: string;
+  name: string;
+  password_hash: string;
 }
 
 export interface PasswordItemRow {
@@ -33,7 +40,7 @@ export interface PasswordItemRow {
 
 export interface PasswordItemInput {
   id: string;
-  userId: string;
+  profileId: string;
   title: string;
   category: string;
   loginUrl: string | null;
@@ -56,6 +63,19 @@ export interface FileAssetRow {
   size: number;
   remark: string | null;
   updated_at: string;
+}
+
+export interface FileAssetInput {
+  id: string;
+  profileId: string;
+  module: string;
+  category: string | null;
+  title: string;
+  originalName: string;
+  storagePath: string;
+  mimeType: string;
+  size: number;
+  remark: string | null;
 }
 
 /**
@@ -104,6 +124,15 @@ const initializeDatabase = (database: DatabaseConnection): void => {
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- 档案配置表：不同密码进入不同档案空间
+    CREATE TABLE IF NOT EXISTS archive_profiles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
     -- 密码资料表：保存平台账号、登录方式、密码和备注
     CREATE TABLE IF NOT EXISTS password_items (
       id TEXT PRIMARY KEY,
@@ -142,6 +171,8 @@ const initializeDatabase = (database: DatabaseConnection): void => {
   `);
 
   migratePasswordItemColumns(database);
+  ensureDefaultProfiles(database);
+  migrateOwnerDataToProfiles(database);
 };
 
 /**
@@ -161,6 +192,62 @@ const migratePasswordItemColumns = (database: DatabaseConnection): void => {
   if (!columnNames.has('email')) {
     database.exec('ALTER TABLE password_items ADD COLUMN email TEXT');
   }
+};
+
+/**
+ * 初始化默认档案
+ * @param database - SQLite 数据库连接
+ * @returns 无返回值
+ * @throws 当写入失败时抛出异常
+ */
+const ensureDefaultProfiles = (database: DatabaseConnection): void => {
+  const personalPassword = process.env.NUXT_PERSONAL_ARCHIVE_PASSWORD || 'xinjie123';
+  const demoPassword = process.env.NUXT_DEMO_ARCHIVE_PASSWORD || '123456';
+  const insertProfile = database.prepare(`
+    INSERT INTO archive_profiles (id, name, password_hash, created_at, updated_at)
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO NOTHING
+  `);
+  const updateProfilePassword = database.prepare(`
+    UPDATE archive_profiles
+    SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+
+  insertProfile.run('personal', '个人档案', bcrypt.hashSync(personalPassword, 12));
+  insertProfile.run('demo', '演示档案', bcrypt.hashSync(demoPassword, 12));
+
+  if (process.env.NUXT_PERSONAL_ARCHIVE_PASSWORD) {
+    updateProfilePassword.run(bcrypt.hashSync(personalPassword, 12), 'personal');
+  }
+
+  if (process.env.NUXT_DEMO_ARCHIVE_PASSWORD) {
+    updateProfilePassword.run(bcrypt.hashSync(demoPassword, 12), 'demo');
+  }
+};
+
+/**
+ * 将旧 owner 数据迁移到档案空间
+ * @param database - SQLite 数据库连接
+ * @returns 无返回值
+ * @throws 当迁移失败时抛出异常
+ */
+const migrateOwnerDataToProfiles = (database: DatabaseConnection): void => {
+  database
+    .prepare("UPDATE password_items SET user_id = 'demo' WHERE user_id = 'owner' AND id LIKE 'seed-%'")
+    .run();
+  database
+    .prepare("UPDATE file_assets SET user_id = 'demo' WHERE user_id = 'owner' AND id LIKE 'seed-%'")
+    .run();
+  database
+    .prepare("UPDATE file_assets SET storage_path = 'demo/' || storage_path WHERE user_id = 'demo' AND id LIKE 'seed-%' AND storage_path NOT LIKE 'demo/%'")
+    .run();
+  database
+    .prepare("UPDATE password_items SET user_id = 'personal' WHERE user_id = 'owner'")
+    .run();
+  database
+    .prepare("UPDATE file_assets SET user_id = 'personal' WHERE user_id = 'owner'")
+    .run();
 };
 
 /**
@@ -194,38 +281,50 @@ export const setSetting = (key: string, value: string): void => {
 };
 
 /**
+ * 查询所有档案配置
+ * @returns 档案配置列表
+ * @throws 当查询失败时抛出异常
+ */
+export const listArchiveProfiles = (): ArchiveProfileRow[] => {
+  const database = getDatabase();
+  return database
+    .prepare('SELECT id, name, password_hash FROM archive_profiles ORDER BY created_at ASC')
+    .all() as ArchiveProfileRow[];
+};
+
+/**
  * 统计指定用户的密码记录数量
- * @param userId - 用户标识
+ * @param profileId - 档案标识
  * @returns 密码记录数量
  * @throws 当查询失败时抛出异常
  */
-export const countPasswords = (userId: string): number => {
+export const countPasswords = (profileId: string): number => {
   const database = getDatabase();
-  const row = database.prepare('SELECT COUNT(*) AS total FROM password_items WHERE user_id = ?').get(userId) as CountRow;
+  const row = database.prepare('SELECT COUNT(*) AS total FROM password_items WHERE user_id = ?').get(profileId) as CountRow;
   return row.total;
 };
 
 /**
  * 统计指定用户和模块的文件数量
- * @param userId - 用户标识
+ * @param profileId - 档案标识
  * @param module - 文件所属模块
  * @returns 文件数量
  * @throws 当查询失败时抛出异常
  */
-export const countFilesByModule = (userId: string, module: string): number => {
+export const countFilesByModule = (profileId: string, module: string): number => {
   const database = getDatabase();
-  const row = database.prepare('SELECT COUNT(*) AS total FROM file_assets WHERE user_id = ? AND module = ?').get(userId, module) as CountRow;
+  const row = database.prepare('SELECT COUNT(*) AS total FROM file_assets WHERE user_id = ? AND module = ?').get(profileId, module) as CountRow;
   return row.total;
 };
 
 /**
  * 查询指定用户的密码记录列表
- * @param userId - 用户标识
+ * @param profileId - 档案标识
  * @param keyword - 搜索关键词
  * @returns 密码记录列表
  * @throws 当查询失败时抛出异常
  */
-export const listPasswordItems = (userId: string, keyword: string): PasswordItemRow[] => {
+export const listPasswordItems = (profileId: string, keyword: string): PasswordItemRow[] => {
   const database = getDatabase();
   const normalizedKeyword = `%${keyword.trim()}%`;
 
@@ -237,7 +336,7 @@ export const listPasswordItems = (userId: string, keyword: string): PasswordItem
         WHERE user_id = ?
         ORDER BY updated_at DESC
       `)
-      .all(userId) as PasswordItemRow[];
+      .all(profileId) as PasswordItemRow[];
   }
 
   return database
@@ -248,7 +347,7 @@ export const listPasswordItems = (userId: string, keyword: string): PasswordItem
         AND (title LIKE ? OR category LIKE ? OR account LIKE ? OR remark LIKE ?)
       ORDER BY updated_at DESC
     `)
-    .all(userId, normalizedKeyword, normalizedKeyword, normalizedKeyword, normalizedKeyword) as PasswordItemRow[];
+    .all(profileId, normalizedKeyword, normalizedKeyword, normalizedKeyword, normalizedKeyword) as PasswordItemRow[];
 };
 
 /**
@@ -268,7 +367,7 @@ export const createPasswordItem = (input: PasswordItemInput): string => {
     `)
     .run(
       input.id,
-      input.userId,
+      input.profileId,
       input.title,
       input.category,
       input.loginUrl,
@@ -318,7 +417,7 @@ export const updatePasswordItem = (input: PasswordItemInput): boolean => {
       input.email,
       input.remark,
       input.id,
-      input.userId
+      input.profileId
     );
 
   return result.changes > 0;
@@ -327,25 +426,25 @@ export const updatePasswordItem = (input: PasswordItemInput): boolean => {
 /**
  * 删除密码记录
  * @param id - 密码记录标识
- * @param userId - 用户标识
+ * @param profileId - 档案标识
  * @returns 是否删除成功
  * @throws 当删除失败时抛出异常
  */
-export const deletePasswordItem = (id: string, userId: string): boolean => {
+export const deletePasswordItem = (id: string, profileId: string): boolean => {
   const database = getDatabase();
-  const result = database.prepare('DELETE FROM password_items WHERE id = ? AND user_id = ?').run(id, userId);
+  const result = database.prepare('DELETE FROM password_items WHERE id = ? AND user_id = ?').run(id, profileId);
   return result.changes > 0;
 };
 
 /**
  * 查询指定用户和模块的文件资产列表
- * @param userId - 用户标识
+ * @param profileId - 档案标识
  * @param module - 文件所属模块
  * @param keyword - 搜索关键词
  * @returns 文件资产列表
  * @throws 当查询失败时抛出异常
  */
-export const listFileAssets = (userId: string, module: string, keyword: string): FileAssetRow[] => {
+export const listFileAssets = (profileId: string, module: string, keyword: string): FileAssetRow[] => {
   const database = getDatabase();
   const normalizedKeyword = `%${keyword.trim()}%`;
 
@@ -357,7 +456,7 @@ export const listFileAssets = (userId: string, module: string, keyword: string):
         WHERE user_id = ? AND module = ?
         ORDER BY updated_at DESC
       `)
-      .all(userId, module) as FileAssetRow[];
+      .all(profileId, module) as FileAssetRow[];
   }
 
   return database
@@ -369,5 +468,109 @@ export const listFileAssets = (userId: string, module: string, keyword: string):
         AND (title LIKE ? OR category LIKE ? OR original_name LIKE ? OR remark LIKE ?)
       ORDER BY updated_at DESC
     `)
-    .all(userId, module, normalizedKeyword, normalizedKeyword, normalizedKeyword, normalizedKeyword) as FileAssetRow[];
+    .all(profileId, module, normalizedKeyword, normalizedKeyword, normalizedKeyword, normalizedKeyword) as FileAssetRow[];
+};
+
+/**
+ * 查询指定文件资产
+ * @param profileId - 档案标识
+ * @param module - 文件所属模块
+ * @param id - 文件资产标识
+ * @returns 文件资产，不存在时返回 null
+ * @throws 当查询失败时抛出异常
+ */
+export const getFileAssetById = (profileId: string, module: string, id: string): FileAssetRow | null => {
+  const database = getDatabase();
+  const row = database
+    .prepare(`
+      SELECT id, module, category, title, original_name, storage_path, mime_type, size, remark, updated_at
+      FROM file_assets
+      WHERE id = ? AND user_id = ? AND module = ?
+    `)
+    .get(id, profileId, module) as FileAssetRow | undefined;
+
+  return row || null;
+};
+
+/**
+ * 新增文件资产索引
+ * @param input - 文件资产输入
+ * @returns 新增后的文件资产标识
+ * @throws 当写入失败时抛出异常
+ */
+export const createFileAsset = (input: FileAssetInput): string => {
+  const database = getDatabase();
+  database
+    .prepare(`
+      INSERT INTO file_assets (
+        id, user_id, module, category, title, original_name, storage_path, mime_type, size, remark, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `)
+    .run(
+      input.id,
+      input.profileId,
+      input.module,
+      input.category,
+      input.title,
+      input.originalName,
+      input.storagePath,
+      input.mimeType,
+      input.size,
+      input.remark
+    );
+
+  return input.id;
+};
+
+/**
+ * 更新文件资产索引
+ * @param input - 文件资产输入
+ * @returns 是否更新成功
+ * @throws 当写入失败时抛出异常
+ */
+export const updateFileAsset = (input: FileAssetInput): boolean => {
+  const database = getDatabase();
+  const result = database
+    .prepare(`
+      UPDATE file_assets
+      SET
+        category = ?,
+        title = ?,
+        original_name = ?,
+        storage_path = ?,
+        mime_type = ?,
+        size = ?,
+        remark = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND user_id = ? AND module = ?
+    `)
+    .run(
+      input.category,
+      input.title,
+      input.originalName,
+      input.storagePath,
+      input.mimeType,
+      input.size,
+      input.remark,
+      input.id,
+      input.profileId,
+      input.module
+    );
+
+  return result.changes > 0;
+};
+
+/**
+ * 删除文件资产索引
+ * @param id - 文件资产标识
+ * @param profileId - 档案标识
+ * @param module - 文件所属模块
+ * @returns 是否删除成功
+ * @throws 当删除失败时抛出异常
+ */
+export const deleteFileAsset = (id: string, profileId: string, module: string): boolean => {
+  const database = getDatabase();
+  const result = database.prepare('DELETE FROM file_assets WHERE id = ? AND user_id = ? AND module = ?').run(id, profileId, module);
+  return result.changes > 0;
 };

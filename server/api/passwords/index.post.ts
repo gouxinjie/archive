@@ -7,20 +7,19 @@ import { defineEventHandler, readBody } from 'h3';
 import { createErrorResponse, createSuccessResponse, getErrorMessage } from '../../utils/apiResponse';
 import { createPasswordItem } from '../../utils/database';
 import { parsePasswordPayload, type PasswordRequestBody } from '../../utils/passwordPayload';
-import { assertAuthenticated, assertCsrfToken, assertValidUserId } from '../../utils/security';
+import { assertAuthenticated, assertCsrfToken } from '../../utils/security';
 
 export default defineEventHandler(async (event) => {
   try {
     assertCsrfToken(event);
 
     const body = await readBody<PasswordRequestBody>(event);
-    const userId = assertValidUserId(body.userId);
-    assertAuthenticated(event, userId);
+    const session = assertAuthenticated(event);
 
     const payload = parsePasswordPayload(body);
     const id = createPasswordItem({
       id: randomUUID(),
-      userId,
+      profileId: session.profileId,
       ...payload
     });
 

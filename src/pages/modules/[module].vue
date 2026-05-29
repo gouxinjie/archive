@@ -16,6 +16,8 @@ import type { DashboardSummaryData } from '~/types/api';
 import type {
   ArchiveModuleConfig,
   ArchiveModuleKey,
+  DocumentFormPayload,
+  DocumentListItem,
   FileAssetListItem,
   ModuleDetailData,
   PasswordFormPayload,
@@ -23,9 +25,13 @@ import type {
 } from '~/types/models';
 import { request } from '~/utils/request';
 
+definePageMeta({
+  pageTransition: false
+});
+
 const route = useRoute();
 const session = useArchiveSession();
-const summary = ref<DashboardSummaryData>({
+const createEmptySummary = (): DashboardSummaryData => ({
   passwordCount: 0,
   documentCount: 0,
   resumeCount: 0,
@@ -33,14 +39,26 @@ const summary = ref<DashboardSummaryData>({
   certificateCount: 0,
   studyCount: 0
 });
-const moduleData = ref<ModuleDetailData | null>(null);
+
+const summary = useState<DashboardSummaryData>('archive-module-summary', createEmptySummary);
+const summaryLoaded = useState<boolean>('archive-module-summary-loaded', () => false);
+const summaryLoading = useState<boolean>('archive-module-summary-loading', () => false);
+const summaryProfileId = useState<string | null>('archive-module-summary-profile-id', () => null);
+const moduleData = useState<ModuleDetailData | null>('archive-module-data', () => null);
+const moduleDataProfileId = useState<string | null>('archive-module-data-profile-id', () => null);
 const loading = ref(false);
 const moduleError = ref('');
 const currentKeyword = ref('');
 const passwordOperationLoading = ref(false);
 const passwordOperationError = ref('');
 const passwordSuccessVersion = ref(0);
+const documentOperationLoading = ref(false);
+const documentOperationError = ref('');
+const documentSuccessVersion = ref(0);
 let moduleRequestSerial = 0;
+const activeModuleLoadSignature = useState<string>('archive-module-active-load-signature', () => '');
+
+const currentProfileId = computed<string | null>(() => session.status.value.profileId || null);
 
 const moduleKey = computed<ArchiveModuleKey | null>(() => {
   const value = route.params.module;
@@ -54,15 +72,15 @@ const fallbackModule = computed<ArchiveModuleConfig>(() => {
 });
 
 const currentModule = computed<ArchiveModuleConfig>(() => {
-  if (moduleData.value?.module.key === moduleKey.value) {
+  if (moduleDataProfileId.value === currentProfileId.value && moduleData.value?.module.key === moduleKey.value) {
     return moduleData.value.module;
   }
 
   return fallbackModule.value;
 });
 
-const currentItems = computed<PasswordListItem[] | FileAssetListItem[]>(() => {
-  if (moduleData.value?.module.key === moduleKey.value) {
+const currentItems = computed<PasswordListItem[] | DocumentListItem[] | FileAssetListItem[]>(() => {
+  if (moduleDataProfileId.value === currentProfileId.value && moduleData.value?.module.key === moduleKey.value) {
     return moduleData.value.items;
   }
 
@@ -75,10 +93,28 @@ const currentItems = computed<PasswordListItem[] | FileAssetListItem[]>(() => {
  * @throws 请求异常会向上抛出
  */
 const loadSummary = async (): Promise<void> => {
-  const response = await request<DashboardSummaryData>('/api/dashboard/summary');
+  if (summaryLoading.value) {
+    return;
+  }
 
-  if (response.success) {
-    summary.value = response.data;
+  const targetProfileId = currentProfileId.value;
+
+  if (!targetProfileId) {
+    return;
+  }
+
+  summaryLoading.value = true;
+
+  try {
+    const response = await request<DashboardSummaryData>('/api/dashboard/summary');
+
+    if (response.success && currentProfileId.value === targetProfileId) {
+      summary.value = response.data;
+      summaryLoaded.value = true;
+      summaryProfileId.value = targetProfileId;
+    }
+  } finally {
+    summaryLoading.value = false;
   }
 };
 
@@ -93,9 +129,23 @@ const loadModuleData = async (keyword = currentKeyword.value): Promise<void> => 
 
   if (!targetModuleKey) {
     moduleData.value = null;
+    moduleDataProfileId.value = null;
     return;
   }
 
+  const targetProfileId = currentProfileId.value;
+
+  if (!targetProfileId) {
+    return;
+  }
+
+  const loadSignature = `${targetProfileId}::${targetModuleKey}::${keyword.trim()}`;
+
+  if (activeModuleLoadSignature.value === loadSignature) {
+    return;
+  }
+
+  activeModuleLoadSignature.value = loadSignature;
   const requestSerial = moduleRequestSerial + 1;
   moduleRequestSerial = requestSerial;
   currentKeyword.value = keyword;
@@ -107,12 +157,13 @@ const loadModuleData = async (keyword = currentKeyword.value): Promise<void> => 
       query: { keyword }
     });
 
-    if (requestSerial !== moduleRequestSerial || moduleKey.value !== targetModuleKey) {
+    if (requestSerial !== moduleRequestSerial || moduleKey.value !== targetModuleKey || currentProfileId.value !== targetProfileId) {
       return;
     }
 
     if (response.success) {
       moduleData.value = response.data;
+      moduleDataProfileId.value = targetProfileId;
       return;
     }
 
@@ -124,6 +175,10 @@ const loadModuleData = async (keyword = currentKeyword.value): Promise<void> => 
     if (requestSerial === moduleRequestSerial) {
       loading.value = false;
     }
+
+    if (activeModuleLoadSignature.value === loadSignature) {
+      activeModuleLoadSignature.value = '';
+    }
   }
 };
 
@@ -132,12 +187,26 @@ const loadModuleData = async (keyword = currentKeyword.value): Promise<void> => 
  * @returns 无返回值
  * @throws 不主动抛出异常
  */
-const loadPageData = async (keyword = currentKeyword.value): Promise<void> => {
-  if (!session.authenticated.value) {
+const loadPageData = async (keyword = currentKeyword.value, refreshSummary = false): Promise<void> => {
+  if (!session.authenticated.value || !currentProfileId.value) {
     return;
   }
 
-  await Promise.all([loadSummary(), loadModuleData(keyword)]);
+  if (refreshSummary || !summaryLoaded.value || summaryProfileId.value !== currentProfileId.value) {
+    await Promise.all([loadSummary(), loadModuleData(keyword)]);
+    return;
+  }
+
+  await loadModuleData(keyword);
+};
+
+const resetArchiveModuleCache = (): void => {
+  summary.value = createEmptySummary();
+  summaryLoaded.value = false;
+  summaryProfileId.value = null;
+  moduleData.value = null;
+  moduleDataProfileId.value = null;
+  activeModuleLoadSignature.value = '';
 };
 
 const handleSetup = async (password: string): Promise<void> => {
@@ -191,7 +260,7 @@ const handleSavePassword = async (payload: PasswordFormPayload): Promise<void> =
     }
 
     passwordSuccessVersion.value += 1;
-    await loadPageData(currentKeyword.value);
+    await loadPageData(currentKeyword.value, true);
   } catch (error: unknown) {
     passwordOperationError.value = error instanceof Error ? error.message : '密码记录保存失败';
     console.error(passwordOperationError.value);
@@ -215,12 +284,72 @@ const handleDeletePassword = async (id: string): Promise<void> => {
       return;
     }
 
-    await loadPageData(currentKeyword.value);
+    await loadPageData(currentKeyword.value, true);
   } catch (error: unknown) {
     moduleError.value = error instanceof Error ? error.message : '密码记录删除失败';
     console.error(moduleError.value);
   } finally {
     passwordOperationLoading.value = false;
+  }
+};
+
+const handleSaveDocument = async (payload: DocumentFormPayload): Promise<void> => {
+  documentOperationLoading.value = true;
+  documentOperationError.value = '';
+  moduleError.value = '';
+
+  try {
+    const response = await request<{ id: string }>(
+      payload.id ? `/api/documents/${payload.id}` : '/api/documents',
+      {
+        method: payload.id ? 'PUT' : 'POST',
+        body: {
+          title: payload.title,
+          category: payload.category,
+          fileType: payload.fileType,
+          originalName: payload.originalName,
+          content: payload.content,
+          remark: payload.remark
+        }
+      }
+    );
+
+    if (!response.success) {
+      documentOperationError.value = response.message;
+      return;
+    }
+
+    documentSuccessVersion.value += 1;
+    await loadPageData(currentKeyword.value, true);
+  } catch (error: unknown) {
+    documentOperationError.value = error instanceof Error ? error.message : '文档保存失败';
+    console.error(documentOperationError.value);
+  } finally {
+    documentOperationLoading.value = false;
+  }
+};
+
+const handleDeleteDocument = async (id: string): Promise<void> => {
+  documentOperationLoading.value = true;
+  documentOperationError.value = '';
+  moduleError.value = '';
+
+  try {
+    const response = await request<{ id: string }>(`/api/documents/${id}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.success) {
+      moduleError.value = response.message;
+      return;
+    }
+
+    await loadPageData(currentKeyword.value, true);
+  } catch (error: unknown) {
+    moduleError.value = error instanceof Error ? error.message : '文档删除失败';
+    console.error(moduleError.value);
+  } finally {
+    documentOperationLoading.value = false;
   }
 };
 
@@ -231,13 +360,20 @@ onMounted(async () => {
 });
 
 watch(
-  [() => session.initialized.value, () => session.authenticated.value, () => route.fullPath],
-  async ([initialized, authenticated]) => {
-    if (initialized && authenticated) {
-      currentKeyword.value = '';
-      passwordOperationError.value = '';
-      await loadPageData('');
+  [() => session.initialized.value, () => session.authenticated.value, currentProfileId, moduleKey],
+  async ([initialized, authenticated, profileId, currentModuleKey]) => {
+    if (!initialized || !authenticated || !profileId || !currentModuleKey) {
+      return;
     }
+
+    if (summaryProfileId.value && summaryProfileId.value !== profileId) {
+      resetArchiveModuleCache();
+    }
+
+    currentKeyword.value = '';
+    passwordOperationError.value = '';
+    documentOperationError.value = '';
+    await loadPageData('');
   },
   { immediate: true }
 );
@@ -265,11 +401,16 @@ watch(
     :password-operation-loading="passwordOperationLoading"
     :password-operation-error="passwordOperationError"
     :password-success-version="passwordSuccessVersion"
+    :document-operation-loading="documentOperationLoading"
+    :document-operation-error="documentOperationError"
+    :document-success-version="documentSuccessVersion"
     @lock="handleLock"
     @back-home="handleBackHome"
     @open-module="handleOpenModule"
     @search="loadModuleData"
     @save-password="handleSavePassword"
     @delete-password="handleDeletePassword"
+    @save-document="handleSaveDocument"
+    @delete-document="handleDeleteDocument"
   />
 </template>

@@ -17,6 +17,7 @@
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.9.1",
     "element-plus": "^2.14.0",
+    "markdown-it": "^14.2.0",
     "nuxt": "^4.0.0",
     "ofetch": "^1.4.1"
   },
@@ -24,6 +25,7 @@
     "@nuxt/eslint": "^1.10.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/better-sqlite3": "^7.6.13",
+    "@types/markdown-it": "^14.1.2",
     "eslint": "^9.17.0",
     "sass": "^1.83.0",
     "typescript": "^5.7.2",

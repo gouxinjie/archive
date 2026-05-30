@@ -1,7 +1,7 @@
 /**
- * 文件说明：个人档案工作台样式
- * 样式说明：定义顶部品牌栏、横向模块导航、概览区和紧凑模块列表
- * 关键布局说明：页面采用顶部导航和内容工作台，避免后台式左右分栏
+ * 文件说明：个人档案首页仪表盘样式
+ * 样式说明：定义顶部栏、Dashboard 导航、总览统计、模块入口和上传面板
+ * 关键布局说明：首页采用顶部固定信息区与双栏工作区，避免后台侧边栏布局
  */
 
 @use "~/styles/variables.scss" as *;
@@ -9,24 +9,50 @@
 
 .dashboard-shell {
   background:
-    linear-gradient(180deg, rgba(59, 130, 246, 0.12), transparent 300px),
+    linear-gradient(180deg, rgba(59, 130, 246, 0.12), transparent 260px),
     $color-bg-main;
+  align-content: start;
   display: grid;
   gap: $space-4;
+  grid-template-rows: max-content auto;
+  max-width: 100%;
   min-height: 100vh;
-  padding: $space-5;
+  min-width: 0;
+  overflow-x: clip;
+  padding: 0 0 $space-4;
+  width: 100%;
+
+  &__header {
+    align-self: start;
+    background: rgba(248, 251, 255, 0.86);
+    backdrop-filter: blur(18px);
+    border-bottom: 1px solid $color-border-soft;
+    box-sizing: border-box;
+    box-shadow: 0 10px 22px rgba(30, 64, 105, 0.08);
+    display: grid;
+    gap: 0;
+    margin: 0;
+    max-width: none;
+    min-width: 0;
+    overflow: hidden;
+    position: sticky;
+    top: 0;
+    width: 100%;
+    z-index: 20;
+  }
 
   &__topbar {
     align-items: center;
-    background: rgba(248, 251, 255, 0.82);
-    border: 1px solid $color-border-soft;
-    border-radius: $radius-md;
-    box-shadow: 0 10px 24px rgba(30, 64, 105, 0.08);
+    box-sizing: border-box;
     display: grid;
     gap: $space-4;
-    grid-template-columns: auto minmax(240px, 520px) auto;
-    min-height: 68px;
-    padding: $space-3 $space-4;
+    grid-template-columns: auto minmax(140px, 1fr) minmax(420px, 640px);
+    height: 64px;
+    margin: 0 auto;
+    max-width: 1280px;
+    min-width: 0;
+    padding: $space-2 0;
+    width: min(calc(100% - 48px), 1280px);
   }
 
   &__brand {
@@ -42,13 +68,17 @@
     border-radius: $radius-md;
     color: #ffffff;
     display: inline-flex;
-    flex: 0 0 42px;
+    flex: 0 0 38px;
     font-weight: 900;
-    height: 42px;
+    height: 38px;
     justify-content: center;
+    width: 38px;
   }
 
-  &__brand-en {
+  &__brand-en,
+  &__page-kicker,
+  &__section-kicker,
+  &__eyebrow {
     color: $color-primary;
     display: block;
     font-size: 11px;
@@ -58,47 +88,101 @@
     text-transform: uppercase;
   }
 
-  &__brand-name {
+  &__brand-name,
+  &__page-title {
     @include text-ellipsis;
+    color: $color-text-main;
     display: block;
-    font-size: 18px;
+    font-size: 17px;
     margin-top: $space-1;
   }
 
+  &__page-meta {
+    border-left: 1px solid rgba(183, 204, 228, 0.7);
+    min-width: 0;
+    padding-left: $space-4;
+  }
+
+  &__page-title {
+    font-size: 18px;
+  }
+
+  &__topbar-actions {
+    align-items: end;
+    display: flex;
+    gap: $space-3;
+    justify-content: flex-end;
+    min-width: 0;
+  }
+
   &__search {
-    width: 100%;
+    flex: 1 1 360px;
+    gap: $space-1;
+    max-width: 480px;
+    min-width: 240px;
+
+    :deep(.archive-input__label) {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    :deep(.archive-input__control) {
+      min-height: 36px;
+    }
+  }
+
+  &__logout-button {
+    flex: 0 0 auto;
+    min-width: 104px;
   }
 
   &__module-nav {
-    background: rgba(248, 251, 255, 0.62);
-    border: 1px solid $color-border-soft;
-    border-radius: $radius-md;
+    align-items: center;
+    background: rgba(248, 251, 255, 0.54);
+    border-top: 1px solid $color-border-soft;
+    box-sizing: border-box;
+    display: flex;
+    height: 56px;
     min-width: 0;
     overflow-x: auto;
-    padding: $space-2;
+    overflow-y: hidden;
+    padding: $space-2 0;
+    scrollbar-width: none;
+    width: 100%;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
   }
 
   &__module-track {
     display: flex;
     gap: $space-2;
+    margin: 0 auto;
+    max-width: 1280px;
     min-width: max-content;
+    width: min(calc(100% - 48px), 1280px);
   }
 
   &__module-tab {
     align-items: center;
-    background: rgba(255, 255, 255, 0.66);
+    background: rgba(255, 255, 255, 0.64);
     border: 1px solid transparent;
     border-radius: $radius-sm;
     color: $color-text-muted;
+    cursor: pointer;
     display: inline-flex;
+    font-weight: 400;
     gap: $space-2;
-    min-height: 38px;
+    min-height: 36px;
     padding: 0 $space-3;
     white-space: nowrap;
 
-    &:hover {
+    &:hover,
+    &--active {
       background: #ffffff;
       border-color: rgba(14, 165, 233, 0.28);
+      box-shadow: 0 6px 16px rgba(30, 64, 105, 0.08);
       color: $color-text-main;
     }
 
@@ -113,6 +197,11 @@
     flex: 0 0 8px;
     height: 8px;
     width: 8px;
+
+    &--dashboard {
+      --module-tone-soft: rgba(15, 118, 110, 0.16);
+      background: #0f766e;
+    }
 
     &--blue {
       --module-tone-soft: rgba(2, 132, 199, 0.16);
@@ -152,13 +241,17 @@
 
   &__main {
     display: grid;
-    gap: $space-4;
+    gap: $space-3;
     margin: 0 auto;
-    max-width: 1280px;
-    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-x: clip;
+    width: min(calc(100% - 32px), 1280px);
   }
 
   &__overview {
+    align-items: center;
     background:
       linear-gradient(135deg, rgba(2, 132, 199, 0.1), rgba(59, 130, 246, 0.05)),
       rgba(248, 251, 255, 0.9);
@@ -166,23 +259,19 @@
     border-radius: $radius-md;
     display: grid;
     gap: $space-5;
-    grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 520px);
     padding: $space-5;
   }
 
-  &__eyebrow {
-    color: $color-primary;
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 0;
-    margin: 0 0 $space-2;
-    text-transform: uppercase;
+  &__overview-content {
+    min-width: 0;
   }
 
   &__title {
-    font-size: clamp(24px, 3vw, 34px);
-    line-height: 1.12;
-    margin: 0;
+    color: $color-text-main;
+    font-size: 30px;
+    line-height: 1.16;
+    margin: $space-2 0 0;
   }
 
   &__description {
@@ -199,11 +288,12 @@
   }
 
   &__stat {
-    background: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.74);
     border: 1px solid rgba(183, 204, 228, 0.72);
     border-radius: $radius-sm;
     display: grid;
     gap: $space-2;
+    min-height: 82px;
     padding: $space-3;
   }
 
@@ -220,43 +310,64 @@
   }
 
   &__workspace {
+    align-items: start;
     display: grid;
     gap: $space-4;
-    grid-template-columns: minmax(320px, 0.85fr) minmax(0, 1.15fr);
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
     min-width: 0;
   }
 
+  &__module-list,
   &__upload-area {
-    display: grid;
-    gap: $space-2;
-    min-width: 0;
-  }
-
-  &__upload-tip {
-    color: $color-accent;
-    font-size: 13px;
-    margin: 0;
-  }
-
-  &__module-list {
-    background: rgba(248, 251, 255, 0.76);
+    background: rgba(248, 251, 255, 0.78);
     border: 1px solid $color-border-soft;
     border-radius: $radius-md;
     display: grid;
+    gap: $space-3;
+    min-width: 0;
+    padding: $space-4;
+  }
+
+  &__section-head {
+    align-items: center;
+    display: flex;
+    gap: $space-3;
+    justify-content: space-between;
+    min-width: 0;
+  }
+
+  &__section-title {
+    color: $color-text-main;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.2;
+    margin: $space-1 0 0;
+  }
+
+  &__section-count {
+    color: $color-text-soft;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  &__module-grid {
+    display: grid;
     gap: $space-2;
-    padding: $space-3;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: 0;
   }
 
   &__module-row {
     align-items: center;
-    background: rgba(255, 255, 255, 0.62);
+    background: rgba(255, 255, 255, 0.66);
     border: 1px solid transparent;
     border-radius: $radius-sm;
     display: grid;
     gap: $space-3;
-    grid-template-columns: 8px minmax(0, 1fr) 54px auto;
-    min-height: 58px;
-    padding: $space-2 $space-3;
+    grid-template-columns: 8px minmax(0, 1fr) 44px auto;
+    min-height: 64px;
+    min-width: 0;
+    padding: $space-3;
     transition:
       background 160ms ease,
       border-color 160ms ease,
@@ -265,7 +376,7 @@
     &:hover {
       background: #ffffff;
       border-color: rgba(14, 165, 233, 0.24);
-      transform: translateX(2px);
+      transform: translateY(-1px);
     }
   }
 
@@ -274,6 +385,7 @@
   }
 
   &__module-title {
+    color: $color-text-main;
     font-size: 15px;
     font-weight: 600;
     margin: 0 0 $space-1;
@@ -292,29 +404,107 @@
     font-weight: 800;
     text-align: right;
   }
-}
 
-@media (max-width: 1080px) {
-  .dashboard-shell {
-    &__topbar,
-    &__overview,
-    &__workspace {
-      grid-template-columns: 1fr;
+  &__upload-tip {
+    color: $color-accent;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  &__upload-area {
+    :deep(.archive-dropzone) {
+      align-items: stretch;
+      flex-direction: column;
     }
 
-    &__topbar {
-      align-items: stretch;
+    :deep(.archive-dropzone__content) {
+      min-width: 0;
     }
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 1180px) {
   .dashboard-shell {
-    padding: $space-4;
+    &__topbar {
+      grid-template-columns: auto minmax(0, 1fr);
+      height: auto;
+      min-height: 68px;
+    }
+
+    &__topbar-actions {
+      grid-column: 1 / -1;
+      justify-content: stretch;
+    }
+
+    &__search {
+      max-width: none;
+    }
+
+    &__overview,
+    &__workspace {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+
+@media (max-width: 760px) {
+  .dashboard-shell {
+    padding: 0 0 $space-3;
+
+    &__topbar {
+      align-items: stretch;
+      grid-template-columns: 1fr;
+    }
+
+    &__topbar,
+    &__module-track {
+      width: calc(100% - 24px);
+    }
+
+    &__main {
+      width: calc(100% - 24px);
+    }
+
+    &__page-meta {
+      border-left: 0;
+      border-top: 1px solid rgba(183, 204, 228, 0.7);
+      padding-left: 0;
+      padding-top: $space-3;
+    }
+
+    &__topbar-actions,
+    &__section-head {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    &__search {
+      min-width: 0;
+    }
+
+    &__logout-button {
+      width: 100%;
+    }
+
+    &__module-track {
+      min-width: max-content;
+    }
+
+    &__overview,
+    &__module-list,
+    &__upload-area {
+      padding: $space-3;
+    }
 
     &__stats,
+    &__module-grid,
     &__module-row {
       grid-template-columns: 1fr;
+    }
+
+    &__title {
+      font-size: 24px;
     }
 
     &__module-row {

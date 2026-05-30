@@ -22,9 +22,10 @@ import type {
   FileAssetListItem,
   ModuleDetailData,
   PasswordFormPayload,
-  PasswordListItem
+  PasswordListItem,
+  ResumeFormPayload
 } from '~/types/models';
-import { request } from '~/utils/request';
+import { request, uploadRequest } from '~/utils/request';
 
 definePageMeta({
   pageTransition: false
@@ -58,6 +59,10 @@ const documentOperationLoading = ref(false);
 const documentOperationError = ref('');
 const documentSuccessVersion = ref(0);
 const documentDeleteSuccessVersion = ref(0);
+const resumeOperationLoading = ref(false);
+const resumeOperationError = ref('');
+const resumeSuccessVersion = ref(0);
+const resumeDeleteSuccessVersion = ref(0);
 let moduleRequestSerial = 0;
 const activeModuleLoadSignature = useState<string>('archive-module-active-load-signature', () => '');
 
@@ -382,6 +387,62 @@ const handleDeleteDocument = async (id: string): Promise<void> => {
   }
 };
 
+const handleSaveResume = async (payload: ResumeFormPayload): Promise<void> => {
+  resumeOperationLoading.value = true;
+  resumeOperationError.value = '';
+  moduleError.value = '';
+
+  const formData = new FormData();
+  formData.append('title', payload.title);
+  formData.append('category', payload.category);
+  formData.append('remark', payload.remark);
+  formData.append('file', payload.file, payload.file.name);
+
+  try {
+    const response = await uploadRequest<{ id: string }>('/api/resumes', formData);
+
+    if (!response.success) {
+      resumeOperationError.value = response.message;
+      return;
+    }
+
+    resumeSuccessVersion.value += 1;
+    ElMessage.success('简历上传成功');
+    await loadPageData(currentKeyword.value, true);
+  } catch (error: unknown) {
+    resumeOperationError.value = error instanceof Error ? error.message : '简历上传失败';
+    console.error(resumeOperationError.value);
+  } finally {
+    resumeOperationLoading.value = false;
+  }
+};
+
+const handleDeleteResume = async (id: string): Promise<void> => {
+  resumeOperationLoading.value = true;
+  resumeOperationError.value = '';
+  moduleError.value = '';
+
+  try {
+    const response = await request<{ id: string }>(`/api/resumes/${id}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.success) {
+      moduleError.value = response.message;
+      return;
+    }
+
+    resumeDeleteSuccessVersion.value += 1;
+    ElMessage.success('简历删除成功');
+    await loadPageData(currentKeyword.value, true);
+  } catch (error: unknown) {
+    moduleError.value = error instanceof Error ? error.message : '简历删除失败';
+    console.error(moduleError.value);
+  } finally {
+    resumeOperationLoading.value = false;
+  }
+};
+
 onMounted(async () => {
   if (!session.initialized.value) {
     await session.loadStatus();
@@ -402,6 +463,7 @@ watch(
     currentKeyword.value = '';
     passwordOperationError.value = '';
     documentOperationError.value = '';
+    resumeOperationError.value = '';
     await loadPageData('');
   },
   { immediate: true }
@@ -433,6 +495,10 @@ watch(
     :document-operation-error="documentOperationError"
     :document-success-version="documentSuccessVersion"
     :document-delete-success-version="documentDeleteSuccessVersion"
+    :resume-operation-loading="resumeOperationLoading"
+    :resume-operation-error="resumeOperationError"
+    :resume-success-version="resumeSuccessVersion"
+    :resume-delete-success-version="resumeDeleteSuccessVersion"
     @lock="handleLock"
     @back-home="handleBackHome"
     @open-module="handleOpenModule"
@@ -441,5 +507,7 @@ watch(
     @delete-password="handleDeletePassword"
     @save-document="handleSaveDocument"
     @delete-document="handleDeleteDocument"
+    @save-resume="handleSaveResume"
+    @delete-resume="handleDeleteResume"
   />
 </template>

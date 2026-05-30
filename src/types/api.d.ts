@@ -44,6 +44,15 @@ export interface CsrfTokenData {
   token: string;
 }
 
+export interface ResumePreviewData {
+  /** 类型：字符串；含义：最终打开的简历预览地址；是否必填：是；默认值：无 */
+  url: string;
+  /** 类型：字符串联合类型；含义：简历预览方式；是否必填：是；默认值：office */
+  mode: 'office' | 'direct';
+  /** 类型：数字；含义：公开文件地址有效期（秒）；是否必填：是；默认值：600 */
+  expiresInSeconds: number;
+}
+
 export interface DashboardSummaryData {
   /** 类型：数字；含义：密码记录数量；是否必填：是；默认值：0 */
   passwordCount: number;

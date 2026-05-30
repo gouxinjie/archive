@@ -27,6 +27,10 @@ const summary = ref<DashboardSummaryData>({
 const summaryLoading = ref(false);
 
 const loadSummary = async (): Promise<void> => {
+  if (summaryLoading.value) {
+    return;
+  }
+
   summaryLoading.value = true;
 
   try {
@@ -55,16 +59,19 @@ const handleOpenModule = async (moduleKey: ArchiveModuleKey): Promise<void> => {
 };
 
 onMounted(async () => {
-  await session.loadStatus();
+  if (!session.initialized.value) {
+    await session.loadStatus();
+  }
 });
 
 watch(
-  () => session.authenticated.value,
-  async (authenticated) => {
-    if (authenticated) {
+  [() => session.initialized.value, () => session.authenticated.value],
+  async ([initialized, authenticated]) => {
+    if (initialized && authenticated) {
       await loadSummary();
     }
-  }
+  },
+  { immediate: true }
 );
 </script>
 

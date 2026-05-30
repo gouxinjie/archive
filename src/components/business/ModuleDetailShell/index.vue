@@ -8,6 +8,7 @@
  */
 
 import { computed, ref, watch } from 'vue';
+import MarkdownIt from 'markdown-it';
 import {
   ArrowRight,
   Close,
@@ -19,22 +20,24 @@ import {
   ElAlert,
   ElButton,
   ElDialog,
-  ElDrawer,
   ElForm,
   ElFormItem,
   ElIcon,
   ElInput,
+  ElMessage,
   ElMessageBox,
   ElOption,
+  ElOptionGroup,
   ElSelect,
   type FormInstance,
   type FormRules
 } from 'element-plus';
 import AppButton from '~/components/commons/AppButton/index.vue';
 import AppInput from '~/components/commons/AppInput/index.vue';
+import FileDropzone from '~/components/commons/FileDropzone/index.vue';
 import { APP_ENGLISH_NAME, APP_NAME, ARCHIVE_MODULES } from '~/constants/app';
 import { PASSWORD_CATEGORY_OPTIONS } from '~/constants/passwordCategories';
-import type { DashboardSummaryData } from '~/types/api';
+import type { DashboardSummaryData, ResumePreviewData } from '~/types/api';
 import type {
   ArchiveModuleConfig,
   ArchiveModuleKey,
@@ -44,7 +47,9 @@ import type {
   DocumentListItem,
   FileAssetListItem,
   PasswordFormPayload,
-  PasswordListItem
+  PasswordListItem,
+  ResumeFileType,
+  ResumeFormPayload
 } from '~/types/models';
 import { request } from '~/utils/request';
 
@@ -75,6 +80,14 @@ interface ModuleDetailShellProps {
   documentSuccessVersion?: number;
   /** 类型：数字；含义：文档删除成功信号；是否必填：否；默认值：0 */
   documentDeleteSuccessVersion?: number;
+  /** 类型：布尔值；含义：简历上传删除操作是否执行中；是否必填：否；默认值：false */
+  resumeOperationLoading?: boolean;
+  /** 类型：字符串；含义：简历弹窗内操作错误提示；是否必填：否；默认值：空字符串 */
+  resumeOperationError?: string;
+  /** 类型：数字；含义：简历上传成功信号；是否必填：否；默认值：0 */
+  resumeSuccessVersion?: number;
+  /** 类型：数字；含义：简历删除成功信号；是否必填：否；默认值：0 */
+  resumeDeleteSuccessVersion?: number;
 }
 
 interface CategoryGroup<T> {
@@ -82,6 +95,26 @@ interface CategoryGroup<T> {
   name: string;
   /** 类型：泛型数组；含义：当前分类下的记录；是否必填：是；默认值：空数组 */
   items: T[];
+}
+
+interface LoginMethodOptionGroup {
+  /** 类型：字符串；含义：登录方式分组名称；是否必填：是；默认值：无 */
+  label: string;
+  /** 类型：字符串数组；含义：当前分组下的登录方式选项；是否必填：是；默认值：空数组 */
+  options: string[];
+}
+
+type DocumentEditorMode = 'write' | 'preview';
+
+interface ResumeFormState {
+  /** 类型：字符串；含义：简历标题；是否必填：是；默认值：空字符串 */
+  title: string;
+  /** 类型：字符串；含义：简历分类；是否必填：否；默认值：通用 */
+  category: string;
+  /** 类型：字符串；含义：上传文件原始名称；是否必填：否；默认值：空字符串 */
+  originalName: string;
+  /** 类型：字符串；含义：备注；是否必填：否；默认值：空字符串 */
+  remark: string;
 }
 
 const props = withDefaults(defineProps<ModuleDetailShellProps>(), {
@@ -93,7 +126,11 @@ const props = withDefaults(defineProps<ModuleDetailShellProps>(), {
   documentOperationLoading: false,
   documentOperationError: '',
   documentSuccessVersion: 0,
-  documentDeleteSuccessVersion: 0
+  documentDeleteSuccessVersion: 0,
+  resumeOperationLoading: false,
+  resumeOperationError: '',
+  resumeSuccessVersion: 0,
+  resumeDeleteSuccessVersion: 0
 });
 
 const emit = defineEmits<{
@@ -105,6 +142,8 @@ const emit = defineEmits<{
   deletePassword: [id: string];
   saveDocument: [payload: DocumentFormPayload];
   deleteDocument: [id: string];
+  saveResume: [payload: ResumeFormPayload];
+  deleteResume: [id: string];
 }>();
 
 const keyword = ref('');
@@ -125,14 +164,36 @@ const passwordForm = ref<PasswordFormPayload>({
   remark: ''
 });
 const passwordCategoryOptions = [...PASSWORD_CATEGORY_OPTIONS];
-const loginMethodOptions = ['手机号', '邮箱', '微信', 'GitHub', '账号密码', '扫码登录'];
+const loginMethodOptionGroups: LoginMethodOptionGroup[] = [
+  {
+    label: '常规方式',
+    options: ['手机号', '邮箱', '账号密码']
+  },
+  {
+    label: '社交通讯',
+    options: ['微信', 'QQ', '企业微信']
+  },
+  {
+    label: '开发账号',
+    options: ['GitHub', 'Gitee', '谷歌账号']
+  },
+  {
+    label: '平台账号',
+    options: ['Apple ID', 'Microsoft 账号', '支付宝']
+  },
+  {
+    label: '其他方式',
+    options: ['扫码登录', '单点登录']
+  }
+];
 const passwordFormRules: FormRules<PasswordFormPayload> = {
   title: [{ required: true, message: '请输入平台名称', trigger: 'blur' }],
   category: [{ required: true, message: '请选择或输入分类', trigger: 'change' }]
 };
 
-const documentDrawerVisible = ref(false);
-const documentDrawerMode = ref<'create' | 'edit' | 'view'>('create');
+const documentDialogVisible = ref(false);
+const documentDialogMode = ref<'create' | 'edit' | 'view'>('create');
+const documentEditorMode = ref<DocumentEditorMode>('write');
 const documentFormError = ref('');
 const documentSubmitAttempted = ref(false);
 const documentContentLoading = ref(false);
@@ -150,9 +211,30 @@ const documentFileTypeOptions: Array<{ label: string; value: DocumentFileType }>
   { label: 'Markdown', value: 'md' },
   { label: 'TXT', value: 'txt' }
 ];
+const documentUploadAccept = '.md,.markdown,.txt,text/markdown,text/plain';
+const maxDocumentUploadBytes = 1024 * 1024;
 const documentFormRules: FormRules<DocumentFormPayload> = {
   title: [{ required: true, message: '请输入文档标题', trigger: 'blur' }],
   fileType: [{ required: true, message: '请选择文档类型', trigger: 'change' }]
+};
+const resumeDialogVisible = ref(false);
+const resumeFormError = ref('');
+const resumeSubmitAttempted = ref(false);
+const resumeFormRef = ref<FormInstance>();
+const selectedResumeFile = ref<File | null>(null);
+const resumePreviewingId = ref('');
+const resumeForm = ref<ResumeFormState>({
+  title: '',
+  category: '通用',
+  originalName: '',
+  remark: ''
+});
+const resumeCategoryOptions = ['Java 后端', '前端开发', '全栈开发', '英文简历', '通用', '其他'];
+const resumeUploadAccept = '.docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const maxResumeUploadBytes = 20 * 1024 * 1024;
+const resumeFormRules: FormRules<ResumeFormState> = {
+  title: [{ required: true, message: '请输入简历标题', trigger: 'blur' }],
+  category: [{ required: true, message: '请选择或输入分类', trigger: 'change' }]
 };
 
 const moduleCounts = computed<Record<ArchiveModuleKey, number>>(() => ({
@@ -166,8 +248,9 @@ const moduleCounts = computed<Record<ArchiveModuleKey, number>>(() => ({
 
 const isPasswordModule = computed<boolean>(() => props.module.key === 'passwords');
 const isDocumentModule = computed<boolean>(() => props.module.key === 'documents');
+const isResumeModule = computed<boolean>(() => props.module.key === 'resumes');
 const isPasswordDialogReadonly = computed<boolean>(() => passwordDialogMode.value === 'view');
-const isDocumentDrawerReadonly = computed<boolean>(() => documentDrawerMode.value === 'view');
+const isDocumentDialogReadonly = computed<boolean>(() => documentDialogMode.value === 'view');
 const passwordDialogTitle = computed<string>(() => {
   if (passwordDialogMode.value === 'create') {
     return '新增密码';
@@ -186,23 +269,30 @@ const passwordDialogErrorMessage = computed<string>(() => {
 
   return passwordSubmitAttempted.value ? props.passwordOperationError : '';
 });
-const documentDrawerTitle = computed<string>(() => {
-  if (documentDrawerMode.value === 'create') {
+const documentDialogTitle = computed<string>(() => {
+  if (documentDialogMode.value === 'create') {
     return '新增文档';
   }
 
-  if (documentDrawerMode.value === 'edit') {
+  if (documentDialogMode.value === 'edit') {
     return '编辑文档';
   }
 
   return '查看文档';
 });
-const documentDrawerErrorMessage = computed<string>(() => {
+const documentDialogErrorMessage = computed<string>(() => {
   if (documentFormError.value) {
     return documentFormError.value;
   }
 
   return documentSubmitAttempted.value ? props.documentOperationError : '';
+});
+const resumeDialogErrorMessage = computed<string>(() => {
+  if (resumeFormError.value) {
+    return resumeFormError.value;
+  }
+
+  return resumeSubmitAttempted.value ? props.resumeOperationError : '';
 });
 
 const passwordItems = computed<PasswordListItem[]>(() => {
@@ -222,7 +312,15 @@ const documentItems = computed<DocumentListItem[]>(() => {
 });
 
 const fileItems = computed<FileAssetListItem[]>(() => {
-  if (isPasswordModule.value || isDocumentModule.value) {
+  if (isPasswordModule.value || isDocumentModule.value || isResumeModule.value) {
+    return [];
+  }
+
+  return props.items as FileAssetListItem[];
+});
+
+const resumeItems = computed<FileAssetListItem[]>(() => {
+  if (!isResumeModule.value) {
     return [];
   }
 
@@ -260,6 +358,10 @@ const documentGroups = computed<CategoryGroup<DocumentListItem>[]>(() => {
   return createCategoryGroups(documentItems.value, (item) => item.category);
 });
 
+const resumeGroups = computed<CategoryGroup<FileAssetListItem>[]>(() => {
+  return createCategoryGroups(resumeItems.value, (item) => item.category);
+});
+
 const fileGroups = computed<CategoryGroup<FileAssetListItem>[]>(() => {
   return createCategoryGroups(fileItems.value, (item) => item.category);
 });
@@ -275,8 +377,97 @@ const formatSize = (size: number): string => {
     return `${size} B`;
   }
 
-  return `${(size / 1024).toFixed(1)} KB`;
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(size / 1024 / 1024).toFixed(1)} MB`;
 };
+
+/**
+ * 创建 Markdown 渲染器
+ * @returns 禁用原生 HTML 的 Markdown 渲染实例
+ * @throws 不抛出异常
+ */
+const createMarkdownRenderer = (): MarkdownIt => {
+  const renderer = new MarkdownIt({
+    html: false,
+    breaks: true,
+    linkify: true,
+    typographer: false,
+    langPrefix: 'language-'
+  });
+
+  renderer.validateLink = (url: string): boolean => {
+    const trimmedUrl = url.trim();
+    return /^(https?:|mailto:|tel:|#|\/)/i.test(trimmedUrl);
+  };
+
+  renderer.renderer.rules.link_open = (tokens, index, options, _env, self) => {
+    const token = tokens[index];
+
+    token?.attrSet('target', '_blank');
+    token?.attrSet('rel', 'noreferrer');
+
+    return self.renderToken(tokens, index, options);
+  };
+
+  renderer.renderer.rules.image = (tokens, index, options, _env, self) => {
+    const token = tokens[index];
+
+    token?.attrSet('loading', 'lazy');
+    token?.attrSet('decoding', 'async');
+
+    return self.renderToken(tokens, index, options);
+  };
+
+  return renderer;
+};
+
+const markdownRenderer = createMarkdownRenderer();
+
+/**
+ * 补齐 GitHub 风格任务列表的勾选框渲染
+ * @param html - Markdown 渲染后的安全 HTML
+ * @returns 增强任务列表后的 HTML
+ * @throws 不抛出异常
+ */
+const normalizeTaskListHtml = (html: string): string => {
+  return html.replace(/<li>(\s*<p>)?\[( |x|X)\]\s+/g, (_match: string, paragraphStart: string, checkedMark: string) => {
+    const checkedAttribute = checkedMark.trim() ? ' checked' : '';
+    const checkboxHtml = `<input class="module-detail__markdown-task-checkbox" type="checkbox" disabled${checkedAttribute}> `;
+
+    return `<li class="module-detail__markdown-task-item">${paragraphStart || ''}${checkboxHtml}`;
+  });
+};
+
+/**
+ * 渲染 Markdown 预览 HTML
+ * @param content - Markdown 源文本
+ * @returns 禁用原生 HTML 后生成的安全预览 HTML
+ * @throws 不抛出异常
+ */
+const renderMarkdownPreviewHtml = (content: string): string => {
+  return normalizeTaskListHtml(markdownRenderer.render(content));
+};
+
+const isDocumentMarkdown = computed<boolean>(() => documentForm.value.fileType === 'md');
+
+const documentContentPlaceholder = computed<string>(() => {
+  if (documentContentLoading.value) {
+    return '正在加载文档内容...';
+  }
+
+  return isDocumentMarkdown.value ? '使用 Markdown 编写内容，右上角可切换预览' : '输入 TXT 文本文档内容';
+});
+
+const documentMarkdownPreviewHtml = computed<string>(() => {
+  return renderMarkdownPreviewHtml(documentForm.value.content);
+});
+
+const hasDocumentMarkdownContent = computed<boolean>(() => {
+  return documentForm.value.content.trim().length > 0;
+});
 
 /**
  * 生成密码记录的平台头像文本
@@ -318,6 +509,28 @@ const getPasswordAccountCountText = (item: PasswordListItem): string => {
  */
 const getDocumentSummaryText = (item: DocumentListItem): string => {
   const values = [item.originalName, item.updatedAt].filter((value): value is string => Boolean(value));
+  return values.join(' · ');
+};
+
+/**
+ * 获取简历文件扩展名
+ * @param item - 简历文件记录
+ * @returns 大写扩展名
+ * @throws 不抛出异常
+ */
+const getResumeExtensionText = (item: FileAssetListItem): string => {
+  const extension = item.originalName.split('.').pop()?.trim();
+  return extension ? extension.toUpperCase() : 'CV';
+};
+
+/**
+ * 获取简历列表的辅助说明
+ * @param item - 简历文件记录
+ * @returns 文件名、备注和更新时间组成的说明文本
+ * @throws 不抛出异常
+ */
+const getResumeSummaryText = (item: FileAssetListItem): string => {
+  const values = [item.originalName, item.remark, item.updatedAt].filter((value): value is string => Boolean(value));
   return values.join(' · ');
 };
 
@@ -441,8 +654,106 @@ const normalizeDocumentFileName = (title: string, fileType: DocumentFileType): s
   return `${safeTitle || 'document'}.${fileType}`;
 };
 
-const openCreateDocumentDrawer = (): void => {
-  documentDrawerMode.value = 'create';
+/**
+ * 根据上传文件推断文档类型
+ * @param file - 用户选择的本地文件
+ * @returns 支持的文档类型，不支持时返回 null
+ * @throws 不抛出异常
+ */
+const getUploadedDocumentFileType = (file: File): DocumentFileType | null => {
+  const fileName = file.name.toLowerCase();
+
+  if (fileName.endsWith('.md') || fileName.endsWith('.markdown') || file.type === 'text/markdown') {
+    return 'md';
+  }
+
+  if (fileName.endsWith('.txt') || file.type === 'text/plain') {
+    return 'txt';
+  }
+
+  return null;
+};
+
+/**
+ * 根据上传文件名生成文档标题
+ * @param fileName - 原始文件名
+ * @returns 去除扩展名后的文档标题
+ * @throws 不抛出异常
+ */
+const normalizeUploadedDocumentTitle = (fileName: string): string => {
+  const title = fileName.replace(/\.(md|markdown|txt)$/i, '').replace(/[-_]+/g, ' ').trim();
+  return title || '未命名文档';
+};
+
+/**
+ * 规范化上传文档的原始文件名
+ * @param fileName - 原始文件名
+ * @param fileType - 文档类型
+ * @returns 与当前文档类型一致的文件名
+ * @throws 不抛出异常
+ */
+const normalizeUploadedDocumentName = (fileName: string, fileType: DocumentFileType): string => {
+  const fileNameWithoutExtension = fileName.replace(/\.(md|markdown|txt)$/i, '').trim();
+  return `${fileNameWithoutExtension || 'document'}.${fileType}`;
+};
+
+/**
+ * 读取上传的 md/txt 文档并填充到表单
+ * @param file - 用户选择的本地文件
+ * @returns 无返回值
+ * @throws 文件读取失败时写入表单错误
+ */
+const applyUploadedDocumentFile = async (file: File): Promise<void> => {
+  const fileType = getUploadedDocumentFileType(file);
+
+  if (!fileType) {
+    documentFormError.value = '仅支持上传 md、markdown 或 txt 文档';
+    return;
+  }
+
+  if (file.size > maxDocumentUploadBytes) {
+    documentFormError.value = '文档内容不能超过 1MB';
+    return;
+  }
+
+  try {
+    const content = await file.text();
+    documentForm.value = {
+      ...documentForm.value,
+      title: documentForm.value.title.trim() || normalizeUploadedDocumentTitle(file.name),
+      fileType,
+      originalName: normalizeUploadedDocumentName(file.name, fileType),
+      content
+    };
+    documentEditorMode.value = 'write';
+    documentFormError.value = '';
+    documentFormRef.value?.clearValidate();
+    ElMessage.success('文档已读取，可继续在线编辑后保存');
+  } catch (error: unknown) {
+    documentFormError.value = error instanceof Error ? error.message : '文档读取失败';
+    console.error(documentFormError.value);
+  }
+};
+
+/**
+ * 处理文档上传选择
+ * @param files - 上传组件返回的文件列表
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const handleDocumentFilesSelected = async (files: File[]): Promise<void> => {
+  const firstFile = files[0];
+
+  if (!firstFile) {
+    return;
+  }
+
+  await applyUploadedDocumentFile(firstFile);
+};
+
+const openCreateDocumentDialog = (): void => {
+  documentDialogMode.value = 'create';
+  documentEditorMode.value = 'write';
   documentFormError.value = '';
   documentSubmitAttempted.value = false;
   documentForm.value = {
@@ -453,7 +764,7 @@ const openCreateDocumentDrawer = (): void => {
     content: '',
     remark: ''
   };
-  documentDrawerVisible.value = true;
+  documentDialogVisible.value = true;
 };
 
 const fillDocumentForm = (item: DocumentListItem, content = ''): void => {
@@ -489,29 +800,42 @@ const loadDocumentDetail = async (item: DocumentListItem): Promise<void> => {
   }
 };
 
-const openViewDocumentDrawer = async (item: DocumentListItem): Promise<void> => {
-  documentDrawerMode.value = 'view';
+const openViewDocumentDialog = async (item: DocumentListItem): Promise<void> => {
+  documentDialogMode.value = 'view';
+  documentEditorMode.value = item.fileType === 'md' ? 'preview' : 'write';
   documentFormError.value = '';
   documentSubmitAttempted.value = false;
   fillDocumentForm(item);
-  documentDrawerVisible.value = true;
+  documentDialogVisible.value = true;
   await loadDocumentDetail(item);
 };
 
-const switchDocumentDrawerToEdit = (): void => {
-  documentDrawerMode.value = 'edit';
+const openEditDocumentDialog = async (item: DocumentListItem): Promise<void> => {
+  documentDialogMode.value = 'edit';
+  documentEditorMode.value = 'write';
+  documentFormError.value = '';
+  documentSubmitAttempted.value = false;
+  fillDocumentForm(item);
+  documentDialogVisible.value = true;
+  await loadDocumentDetail(item);
+};
+
+const switchDocumentDialogToEdit = (): void => {
+  documentDialogMode.value = 'edit';
+  documentEditorMode.value = 'write';
   documentFormError.value = '';
   documentSubmitAttempted.value = false;
 };
 
-const closeDocumentDrawer = (): void => {
-  documentDrawerVisible.value = false;
+const closeDocumentDialog = (): void => {
+  documentDialogVisible.value = false;
+  documentEditorMode.value = 'write';
   documentSubmitAttempted.value = false;
   documentContentLoading.value = false;
 };
 
 const submitDocumentForm = async (): Promise<void> => {
-  if (isDocumentDrawerReadonly.value || props.documentOperationLoading || documentContentLoading.value) {
+  if (isDocumentDialogReadonly.value || props.documentOperationLoading || documentContentLoading.value) {
     return;
   }
 
@@ -568,11 +892,233 @@ const confirmDeleteDocument = async (): Promise<void> => {
   }
 };
 
+/**
+ * 根据上传文件推断简历类型
+ * @param file - 用户选择的本地文件
+ * @returns 支持的简历类型，不支持时返回 null
+ * @throws 不抛出异常
+ */
+const getUploadedResumeFileType = (file: File): ResumeFileType | null => {
+  const fileName = file.name.toLowerCase();
+
+  if (fileName.endsWith('.pdf') || file.type === 'application/pdf') {
+    return 'pdf';
+  }
+
+  if (fileName.endsWith('.docx') || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+    return 'docx';
+  }
+
+  return null;
+};
+
+/**
+ * 根据上传文件名生成简历标题
+ * @param fileName - 原始文件名
+ * @returns 去除扩展名后的简历标题
+ * @throws 不抛出异常
+ */
+const normalizeUploadedResumeTitle = (fileName: string): string => {
+  const title = fileName.replace(/\.(docx|pdf)$/i, '').replace(/[-_]+/g, ' ').trim();
+  return title || '未命名简历';
+};
+
+/**
+ * 读取上传的 docx/pdf 简历并填充表单
+ * @param file - 用户选择的本地文件
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const applyUploadedResumeFile = (file: File): void => {
+  const fileType = getUploadedResumeFileType(file);
+
+  if (!fileType) {
+    resumeFormError.value = '仅支持上传 docx 或 pdf 简历';
+    return;
+  }
+
+  if (file.size > maxResumeUploadBytes) {
+    resumeFormError.value = '简历文件不能超过 20MB';
+    return;
+  }
+
+  selectedResumeFile.value = file;
+  resumeForm.value = {
+    ...resumeForm.value,
+    title: resumeForm.value.title.trim() || normalizeUploadedResumeTitle(file.name),
+    originalName: file.name
+  };
+  resumeFormError.value = '';
+  resumeFormRef.value?.clearValidate();
+  ElMessage.success('简历文件已选择，确认信息后保存');
+};
+
+/**
+ * 处理简历上传选择
+ * @param files - 上传组件返回的文件列表
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const handleResumeFilesSelected = (files: File[]): void => {
+  const firstFile = files[0];
+
+  if (!firstFile) {
+    return;
+  }
+
+  applyUploadedResumeFile(firstFile);
+};
+
+const openCreateResumeDialog = (): void => {
+  resumeFormError.value = '';
+  resumeSubmitAttempted.value = false;
+  selectedResumeFile.value = null;
+  resumeForm.value = {
+    title: '',
+    category: '通用',
+    originalName: '',
+    remark: ''
+  };
+  resumeDialogVisible.value = true;
+};
+
+const closeResumeDialog = (): void => {
+  resumeDialogVisible.value = false;
+  resumeSubmitAttempted.value = false;
+  selectedResumeFile.value = null;
+};
+
+const submitResumeForm = async (): Promise<void> => {
+  if (props.resumeOperationLoading) {
+    return;
+  }
+
+  if (!resumeFormRef.value) {
+    return;
+  }
+
+  const valid = await resumeFormRef.value.validate();
+
+  if (!valid) {
+    return;
+  }
+
+  if (!selectedResumeFile.value) {
+    resumeFormError.value = '请先选择 docx 或 pdf 简历文件';
+    return;
+  }
+
+  resumeFormError.value = '';
+  resumeSubmitAttempted.value = true;
+  emit('saveResume', {
+    title: resumeForm.value.title,
+    category: resumeForm.value.category,
+    file: selectedResumeFile.value,
+    remark: resumeForm.value.remark
+  });
+};
+
+/**
+ * 打开简历文件
+ * @param item - 简历文件记录
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const openResumePreviewWindow = (): Window | null => {
+  const previewWindow = window.open('', '_blank');
+
+  if (!previewWindow) {
+    return null;
+  }
+
+  previewWindow.opener = null;
+  previewWindow.document.title = '正在打开简历预览';
+  previewWindow.document.body.textContent = '正在打开简历预览...';
+  return previewWindow;
+};
+
+const openResumeFile = async (item: FileAssetListItem): Promise<void> => {
+  if (resumePreviewingId.value) {
+    return;
+  }
+
+  const previewWindow = openResumePreviewWindow();
+
+  if (!previewWindow) {
+    ElMessage.error('浏览器拦截了预览窗口，请允许弹窗后重试');
+    return;
+  }
+
+  resumePreviewingId.value = item.id;
+
+  try {
+    const resumeId = encodeURIComponent(item.id);
+    const response = await request<ResumePreviewData>(`/api/resumes/${resumeId}/preview`);
+
+    if (!response.success) {
+      previewWindow.close();
+      ElMessage.error(response.message);
+      return;
+    }
+
+    previewWindow.location.replace(response.data.url);
+  } catch (error: unknown) {
+    previewWindow.close();
+
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
+
+    ElMessage.error('简历预览链接创建失败');
+  } finally {
+    resumePreviewingId.value = '';
+  }
+};
+
+/**
+ * 弹窗确认删除简历文件
+ * @param item - 简历文件记录
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const confirmDeleteResume = async (item: FileAssetListItem): Promise<void> => {
+  if (props.resumeOperationLoading) {
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm('删除后无法恢复，确认删除这份简历？', '删除简历', {
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      confirmButtonText: '删除',
+      confirmButtonClass: 'el-button--danger',
+      lockScroll: false,
+      modal: false,
+      type: 'warning'
+    });
+    emit('deleteResume', item.id);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
+  }
+};
+
 watch(
   () => props.module.key,
   () => {
     passwordDialogVisible.value = false;
-    documentDrawerVisible.value = false;
+    documentDialogVisible.value = false;
+    resumeDialogVisible.value = false;
+  }
+);
+
+watch(
+  () => documentForm.value.fileType,
+  (fileType) => {
+    if (fileType !== 'md') {
+      documentEditorMode.value = 'write';
+    }
   }
 );
 
@@ -597,8 +1143,8 @@ watch(
 watch(
   () => props.documentSuccessVersion,
   () => {
-    if (documentDrawerVisible.value && !isDocumentDrawerReadonly.value) {
-      closeDocumentDrawer();
+    if (documentDialogVisible.value && !isDocumentDialogReadonly.value) {
+      closeDocumentDialog();
     }
   }
 );
@@ -606,8 +1152,26 @@ watch(
 watch(
   () => props.documentDeleteSuccessVersion,
   () => {
-    if (documentDrawerVisible.value) {
-      closeDocumentDrawer();
+    if (documentDialogVisible.value) {
+      closeDocumentDialog();
+    }
+  }
+);
+
+watch(
+  () => props.resumeSuccessVersion,
+  () => {
+    if (resumeDialogVisible.value) {
+      closeResumeDialog();
+    }
+  }
+);
+
+watch(
+  () => props.resumeDeleteSuccessVersion,
+  () => {
+    if (resumeDialogVisible.value) {
+      closeResumeDialog();
     }
   }
 );
@@ -689,10 +1253,18 @@ watch(
             <AppButton
               v-if="isDocumentModule"
               variant="secondary"
-              @click="openCreateDocumentDrawer"
+              @click="openCreateDocumentDialog"
             >
               <el-icon class="module-detail__button-icon"><Plus /></el-icon>
               新增文档
+            </AppButton>
+            <AppButton
+              v-if="isResumeModule"
+              variant="secondary"
+              @click="openCreateResumeDialog"
+            >
+              <el-icon class="module-detail__button-icon"><Plus /></el-icon>
+              上传简历
             </AppButton>
           </div>
         </div>
@@ -739,38 +1311,86 @@ watch(
         </template>
 
         <template v-else-if="isDocumentModule">
-          <section
-            v-for="group in documentGroups"
-            :key="group.name"
-            class="module-detail__category-block"
-          >
-            <header class="module-detail__category-head">
-              <h2 class="module-detail__category-title">{{ group.name }}</h2>
-              <span class="module-detail__category-count">{{ group.items.length }} 条</span>
-            </header>
+          <div class="module-detail__document-category-grid">
+            <section
+              v-for="group in documentGroups"
+              :key="group.name"
+              class="module-detail__category-block module-detail__category-block--document"
+            >
+              <header class="module-detail__category-head">
+                <h2 class="module-detail__category-title">{{ group.name }}</h2>
+                <span class="module-detail__category-count">{{ group.items.length }} 条</span>
+              </header>
 
-            <TransitionGroup name="archive-row" tag="div" class="module-detail__simple-list">
-              <button
-                v-for="item in group.items"
-                :key="item.id"
-                class="module-detail__simple-row"
-                type="button"
-                @click="openViewDocumentDrawer(item)"
-              >
-                <span class="module-detail__simple-icon module-detail__simple-icon--document" aria-hidden="true">
-                  {{ item.fileType.toUpperCase() }}
-                </span>
+              <TransitionGroup name="archive-row" tag="div" class="module-detail__document-card-list">
+                <article
+                  v-for="item in group.items"
+                  :key="item.id"
+                  class="module-detail__document-card"
+                >
+                  <span class="module-detail__simple-icon module-detail__simple-icon--document" aria-hidden="true">
+                    {{ item.fileType.toUpperCase() }}
+                  </span>
 
-                <span class="module-detail__simple-main">
-                  <span class="module-detail__simple-title">{{ item.title }}</span>
-                  <span class="module-detail__simple-meta">{{ getDocumentSummaryText(item) }}</span>
-                </span>
+                  <span class="module-detail__document-card-main">
+                    <span class="module-detail__simple-title">{{ item.title }}</span>
+                    <span class="module-detail__simple-meta">{{ getDocumentSummaryText(item) }}</span>
+                    <span class="module-detail__document-card-size">{{ formatSize(item.size) }}</span>
+                  </span>
 
-                <span class="module-detail__simple-count">{{ formatSize(item.size) }}</span>
-                <el-icon class="module-detail__simple-arrow"><ArrowRight /></el-icon>
-              </button>
-            </TransitionGroup>
-          </section>
+                  <span class="module-detail__document-actions">
+                    <el-button class="module-detail__document-action" text @click="openViewDocumentDialog(item)">查看</el-button>
+                    <el-button class="module-detail__document-action" type="primary" text @click="openEditDocumentDialog(item)">编辑</el-button>
+                  </span>
+                </article>
+              </TransitionGroup>
+            </section>
+          </div>
+        </template>
+
+        <template v-else-if="isResumeModule">
+          <div class="module-detail__resume-category-grid">
+            <section
+              v-for="group in resumeGroups"
+              :key="group.name"
+              class="module-detail__category-block module-detail__category-block--resume"
+            >
+              <header class="module-detail__category-head">
+                <h2 class="module-detail__category-title">{{ group.name }}</h2>
+                <span class="module-detail__category-count">{{ group.items.length }} 条</span>
+              </header>
+
+              <TransitionGroup name="archive-row" tag="div" class="module-detail__resume-card-list">
+                <article
+                  v-for="item in group.items"
+                  :key="item.id"
+                  class="module-detail__resume-card"
+                >
+                  <span class="module-detail__simple-icon module-detail__simple-icon--resume" aria-hidden="true">
+                    {{ getResumeExtensionText(item) }}
+                  </span>
+
+                  <span class="module-detail__resume-card-main">
+                    <span class="module-detail__simple-title">{{ item.title }}</span>
+                    <span class="module-detail__simple-meta">{{ getResumeSummaryText(item) }}</span>
+                    <span class="module-detail__resume-card-size">{{ formatSize(item.size) }}</span>
+                  </span>
+
+                  <span class="module-detail__resume-actions">
+                    <el-button
+                      class="module-detail__resume-action"
+                      text
+                      :loading="resumePreviewingId === item.id"
+                      @click="openResumeFile(item)"
+                    >
+                      预览
+                    </el-button>
+                    <el-button class="module-detail__resume-action" type="danger" text @click="confirmDeleteResume(item)">删除</el-button>
+                  </span>
+                </article>
+              </TransitionGroup>
+            </section>
+          </div>
         </template>
 
         <template v-else>
@@ -893,13 +1513,20 @@ watch(
             allow-create
             default-first-option
             clearable
+            popper-class="module-detail__login-method-popper"
           >
-            <el-option
-              v-for="method in loginMethodOptions"
-              :key="method"
-              :label="method"
-              :value="method"
-            />
+            <el-option-group
+              v-for="group in loginMethodOptionGroups"
+              :key="group.label"
+              :label="group.label"
+            >
+              <el-option
+                v-for="method in group.options"
+                :key="`${group.label}-${method}`"
+                :label="method"
+                :value="method"
+              />
+            </el-option-group>
           </el-select>
         </el-form-item>
 
@@ -989,24 +1616,24 @@ watch(
       </template>
     </el-dialog>
 
-    <el-drawer
-      v-model="documentDrawerVisible"
-      class="module-detail__element-drawer"
-      direction="rtl"
-      size="450px"
+    <el-dialog
+      v-model="documentDialogVisible"
+      class="module-detail__document-dialog"
+      width="920px"
       :close-on-click-modal="!props.documentOperationLoading"
       :close-on-press-escape="!props.documentOperationLoading"
       :show-close="false"
       :lock-scroll="false"
+      align-center
       destroy-on-close
     >
       <template #header>
         <header class="module-detail__drawer-head">
           <div>
             <p class="module-detail__drawer-eyebrow">Document</p>
-            <h2 class="module-detail__drawer-title">{{ documentDrawerTitle }}</h2>
+            <h2 class="module-detail__drawer-title">{{ documentDialogTitle }}</h2>
           </div>
-          <el-button circle text aria-label="关闭抽屉" @click="closeDocumentDrawer">
+          <el-button circle text aria-label="关闭弹窗" @click="closeDocumentDialog">
             <el-icon><Close /></el-icon>
           </el-button>
         </header>
@@ -1014,8 +1641,8 @@ watch(
 
       <el-form
         ref="documentFormRef"
-        class="module-detail__drawer-form module-detail__drawer-form--element"
-        :class="{ 'module-detail__drawer-form--readonly': isDocumentDrawerReadonly }"
+        class="module-detail__drawer-form module-detail__drawer-form--element module-detail__document-form"
+        :class="{ 'module-detail__drawer-form--readonly': isDocumentDialogReadonly }"
         :model="documentForm"
         :rules="documentFormRules"
         label-position="top"
@@ -1026,14 +1653,14 @@ watch(
           <el-input
             v-model="documentForm.title"
             placeholder="例如：部署笔记"
-            :readonly="isDocumentDrawerReadonly"
-            :clearable="!isDocumentDrawerReadonly"
+            :readonly="isDocumentDialogReadonly"
+            :clearable="!isDocumentDialogReadonly"
           />
         </el-form-item>
 
         <el-form-item class="module-detail__drawer-item" label="分类" prop="category">
           <el-input
-            v-if="isDocumentDrawerReadonly"
+            v-if="isDocumentDialogReadonly"
             v-model="documentForm.category"
             readonly
           />
@@ -1057,7 +1684,7 @@ watch(
 
         <el-form-item class="module-detail__drawer-item" label="文档类型" prop="fileType">
           <el-input
-            v-if="isDocumentDrawerReadonly"
+            v-if="isDocumentDialogReadonly"
             :model-value="documentForm.fileType.toUpperCase()"
             readonly
           />
@@ -1075,21 +1702,75 @@ watch(
           <el-input
             v-model="documentForm.originalName"
             placeholder="不填则按标题生成"
-            :readonly="isDocumentDrawerReadonly"
-            :clearable="!isDocumentDrawerReadonly"
+            :readonly="isDocumentDialogReadonly"
+            :clearable="!isDocumentDialogReadonly"
           />
         </el-form-item>
 
-        <el-form-item class="module-detail__drawer-item module-detail__drawer-item--full" label="内容" prop="content">
-          <el-input
-            v-model="documentForm.content"
-            class="module-detail__document-editor"
-            :placeholder="documentContentLoading ? '正在加载文档内容...' : '在这里编写 Markdown 或 TXT 内容'"
-            type="textarea"
-            :autosize="{ minRows: 12, maxRows: 18 }"
-            :readonly="isDocumentDrawerReadonly"
-            :disabled="documentContentLoading"
+        <el-form-item
+          v-if="!isDocumentDialogReadonly"
+          class="module-detail__drawer-item module-detail__drawer-item--full module-detail__document-upload"
+          label="上传文档"
+        >
+          <FileDropzone
+            title="上传 MD / TXT"
+            description="拖拽或选择 .md、.markdown、.txt 文件，读取后可继续在线编辑"
+            :accept="documentUploadAccept"
+            :multiple="false"
+            @files-selected="handleDocumentFilesSelected"
           />
+          <p class="module-detail__document-upload-tip">
+            保存后会写入 uploads 当前账号 documents 目录。
+          </p>
+        </el-form-item>
+
+        <el-form-item class="module-detail__drawer-item module-detail__drawer-item--full module-detail__document-content" label="内容" prop="content">
+          <div class="module-detail__document-editor-shell">
+            <div class="module-detail__document-editor-head">
+              <span class="module-detail__document-editor-title">
+                {{ isDocumentMarkdown ? 'Markdown 内容' : 'TXT 内容' }}
+              </span>
+              <div v-if="isDocumentMarkdown" class="module-detail__document-editor-tabs" aria-label="Markdown 编辑模式">
+                <button
+                  class="module-detail__document-editor-tab"
+                  :class="{ 'module-detail__document-editor-tab--active': documentEditorMode === 'write' }"
+                  type="button"
+                  @click="documentEditorMode = 'write'"
+                >
+                  编辑
+                </button>
+                <button
+                  class="module-detail__document-editor-tab"
+                  :class="{ 'module-detail__document-editor-tab--active': documentEditorMode === 'preview' }"
+                  type="button"
+                  @click="documentEditorMode = 'preview'"
+                >
+                  预览
+                </button>
+              </div>
+            </div>
+
+            <el-input
+              v-if="documentEditorMode === 'write' || !isDocumentMarkdown"
+              v-model="documentForm.content"
+              class="module-detail__document-editor"
+              :placeholder="documentContentPlaceholder"
+              type="textarea"
+              :rows="18"
+              :readonly="isDocumentDialogReadonly"
+              :disabled="documentContentLoading"
+            />
+            <div v-else class="module-detail__markdown-preview">
+              <p v-if="!hasDocumentMarkdownContent" class="module-detail__markdown-empty">
+                暂无 Markdown 内容
+              </p>
+              <div
+                v-else
+                class="module-detail__markdown-body"
+                v-html="documentMarkdownPreviewHtml"
+              />
+            </div>
+          </div>
         </el-form-item>
 
         <el-form-item class="module-detail__drawer-item module-detail__drawer-item--full" label="备注" prop="remark">
@@ -1098,14 +1779,14 @@ watch(
             placeholder="补充说明"
             type="textarea"
             :autosize="{ minRows: 3, maxRows: 5 }"
-            :readonly="isDocumentDrawerReadonly"
+            :readonly="isDocumentDialogReadonly"
           />
         </el-form-item>
 
         <el-alert
-          v-if="documentDrawerErrorMessage"
+          v-if="documentDialogErrorMessage"
           class="module-detail__drawer-alert"
-          :title="documentDrawerErrorMessage"
+          :title="documentDialogErrorMessage"
           type="error"
           show-icon
           :closable="false"
@@ -1115,7 +1796,7 @@ watch(
       <template #footer>
         <div class="module-detail__drawer-actions">
           <el-button
-            v-if="isDocumentDrawerReadonly && documentForm.id"
+            v-if="isDocumentDialogReadonly && documentForm.id"
             type="danger"
             text
             :loading="props.documentOperationLoading"
@@ -1124,22 +1805,135 @@ watch(
             <el-icon><Delete /></el-icon>
             删除
           </el-button>
-          <el-button v-if="isDocumentDrawerReadonly" type="primary" text @click="switchDocumentDrawerToEdit">
+          <el-button v-if="isDocumentDialogReadonly" type="primary" text @click="switchDocumentDialogToEdit">
             <el-icon><EditPen /></el-icon>
             编辑
           </el-button>
-          <el-button @click="closeDocumentDrawer">{{ isDocumentDrawerReadonly ? '关闭' : '取消' }}</el-button>
+          <el-button @click="closeDocumentDialog">{{ isDocumentDialogReadonly ? '关闭' : '取消' }}</el-button>
           <el-button
-            v-if="!isDocumentDrawerReadonly"
+            v-if="!isDocumentDialogReadonly"
             type="primary"
             :loading="props.documentOperationLoading || documentContentLoading"
             @click="submitDocumentForm"
           >
-            {{ documentDrawerMode === 'create' ? '新增' : '保存' }}
+            {{ documentDialogMode === 'create' ? '新增' : '保存' }}
           </el-button>
         </div>
       </template>
-    </el-drawer>
+    </el-dialog>
+
+    <el-dialog
+      v-model="resumeDialogVisible"
+      class="module-detail__resume-dialog"
+      width="720px"
+      :close-on-click-modal="!props.resumeOperationLoading"
+      :close-on-press-escape="!props.resumeOperationLoading"
+      :show-close="false"
+      :lock-scroll="false"
+      align-center
+      destroy-on-close
+    >
+      <template #header>
+        <header class="module-detail__drawer-head">
+          <div>
+            <p class="module-detail__drawer-eyebrow">Resume</p>
+            <h2 class="module-detail__drawer-title">上传简历</h2>
+          </div>
+          <el-button circle text aria-label="关闭弹窗" @click="closeResumeDialog">
+            <el-icon><Close /></el-icon>
+          </el-button>
+        </header>
+      </template>
+
+      <el-form
+        ref="resumeFormRef"
+        class="module-detail__drawer-form module-detail__drawer-form--element module-detail__resume-form"
+        :model="resumeForm"
+        :rules="resumeFormRules"
+        label-position="top"
+        hide-required-asterisk
+        @submit.prevent="submitResumeForm"
+      >
+        <el-form-item class="module-detail__drawer-item" label="简历标题" prop="title">
+          <el-input
+            v-model="resumeForm.title"
+            placeholder="例如：Java 后端简历"
+            clearable
+          />
+        </el-form-item>
+
+        <el-form-item class="module-detail__drawer-item" label="分类" prop="category">
+          <el-select
+            v-model="resumeForm.category"
+            placeholder="选择或输入分类"
+            filterable
+            allow-create
+            default-first-option
+            clearable
+          >
+            <el-option
+              v-for="category in resumeCategoryOptions"
+              :key="category"
+              :label="category"
+              :value="category"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item class="module-detail__drawer-item module-detail__drawer-item--full module-detail__resume-upload" label="上传简历">
+          <FileDropzone
+            title="上传 DOCX / PDF"
+            description="拖拽或选择 .docx、.pdf 文件，保存后可直接打开或下载"
+            :accept="resumeUploadAccept"
+            :multiple="false"
+            @files-selected="handleResumeFilesSelected"
+          />
+          <p class="module-detail__resume-upload-tip">
+            保存后会写入 uploads 当前账号 resumes 目录。
+          </p>
+        </el-form-item>
+
+        <el-form-item class="module-detail__drawer-item module-detail__drawer-item--full" label="已选择文件">
+          <div class="module-detail__resume-selected">
+            <span v-if="selectedResumeFile" class="module-detail__resume-selected-name">
+              {{ resumeForm.originalName }} · {{ formatSize(selectedResumeFile.size) }}
+            </span>
+            <span v-else class="module-detail__resume-selected-empty">尚未选择文件</span>
+          </div>
+        </el-form-item>
+
+        <el-form-item class="module-detail__drawer-item module-detail__drawer-item--full" label="备注" prop="remark">
+          <el-input
+            v-model="resumeForm.remark"
+            placeholder="例如：投递 Java 后端岗位使用"
+            type="textarea"
+            :autosize="{ minRows: 3, maxRows: 5 }"
+          />
+        </el-form-item>
+
+        <el-alert
+          v-if="resumeDialogErrorMessage"
+          class="module-detail__drawer-alert"
+          :title="resumeDialogErrorMessage"
+          type="error"
+          show-icon
+          :closable="false"
+        />
+      </el-form>
+
+      <template #footer>
+        <div class="module-detail__drawer-actions">
+          <el-button @click="closeResumeDialog">取消</el-button>
+          <el-button
+            type="primary"
+            :loading="props.resumeOperationLoading"
+            @click="submitResumeForm"
+          >
+            保存
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 

@@ -479,6 +479,13 @@
       color: #2563eb;
       font-size: 11px;
     }
+
+    &--resume {
+      background: #eef2ff;
+      border-radius: $radius-sm;
+      color: #4f46e5;
+      font-size: 11px;
+    }
   }
 
   &__simple-main {
@@ -511,6 +518,92 @@
   &__simple-arrow {
     color: $color-text-soft;
     font-size: 16px;
+  }
+
+  /* 文档/简历卡片：用于文件类模块的紧凑卡片布局，并提供独立操作入口。 */
+  &__document-category-grid,
+  &__resume-category-grid {
+    display: grid;
+    gap: $space-4;
+    grid-template-columns: 1fr;
+    min-width: 0;
+  }
+
+  &__category-block--document,
+  &__category-block--resume {
+    align-content: start;
+    background: rgba(248, 251, 255, 0.64);
+    border: 1px solid rgba(183, 204, 228, 0.58);
+    border-radius: $radius-md;
+    padding: $space-3;
+  }
+
+  &__document-card-list,
+  &__resume-card-list {
+    display: grid;
+    gap: $space-2;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-width: 0;
+  }
+
+  &__document-card,
+  &__resume-card {
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid $color-border-soft;
+    border-radius: $radius-sm;
+    box-shadow: 0 8px 18px rgba(30, 64, 105, 0.06);
+    display: grid;
+    gap: $space-3;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    min-height: 82px;
+    min-width: 0;
+    padding: $space-3;
+    transition:
+      border-color 160ms ease,
+      box-shadow 160ms ease,
+      transform 160ms ease;
+
+    &:hover {
+      border-color: rgba(14, 165, 233, 0.3);
+      box-shadow: 0 12px 24px rgba(30, 64, 105, 0.1);
+      transform: translateY(-1px);
+    }
+  }
+
+  &__document-card-main,
+  &__resume-card-main {
+    display: grid;
+    gap: $space-1;
+    min-width: 0;
+  }
+
+  &__document-card-size,
+  &__resume-card-size {
+    color: $color-text-soft;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  &__document-actions,
+  &__resume-actions {
+    align-items: center;
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 6px;
+    justify-content: flex-end;
+
+    :deep(.el-button + .el-button) {
+      margin-left: 0;
+    }
+  }
+
+  &__document-action,
+  &__resume-action {
+    font-size: 13px;
+    font-weight: 400;
+    min-width: 0;
+    padding: 0 $space-1;
   }
 
   &__button-icon {
@@ -649,13 +742,321 @@
 
   &__document-editor {
     :deep(.el-textarea__inner) {
+      border: 0;
+      box-shadow: none !important;
       font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 13px;
+      min-height: 430px !important;
       line-height: 1.6;
+      padding: $space-4;
     }
+  }
+
+  &__document-form {
+    row-gap: $space-4;
+  }
+
+  &__document-content {
+    :deep(.el-form-item__content) {
+      display: block;
+      width: 100%;
+    }
+  }
+
+  &__document-upload,
+  &__resume-upload {
+    :deep(.el-form-item__content) {
+      display: grid;
+      gap: $space-2;
+      width: 100%;
+    }
+
+    :deep(.archive-dropzone) {
+      min-height: 64px;
+      padding: $space-3;
+    }
+
+    :deep(.archive-dropzone__mark) {
+      flex-basis: 36px;
+      height: 32px;
+      width: 36px;
+    }
+  }
+
+  &__document-upload-tip,
+  &__resume-upload-tip {
+    color: $color-text-soft;
+    font-size: 12px;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  &__resume-selected {
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid $color-border-soft;
+    border-radius: $radius-sm;
+    display: flex;
+    min-height: 42px;
+    padding: 0 $space-3;
+    width: 100%;
+  }
+
+  &__resume-selected-name {
+    @include text-ellipsis;
+    color: $color-text-main;
+    font-size: 13px;
+  }
+
+  &__resume-selected-empty {
+    color: $color-text-soft;
+    font-size: 13px;
+  }
+
+  &__document-editor-shell {
+    background: #ffffff;
+    border: 1px solid $color-border-soft;
+    border-radius: $radius-sm;
+    overflow: hidden;
+    width: 100%;
+  }
+
+  &__document-editor-head {
+    align-items: center;
+    background: rgba(241, 247, 253, 0.72);
+    border-bottom: 1px solid $color-border-soft;
+    display: flex;
+    gap: $space-3;
+    justify-content: space-between;
+    min-height: 42px;
+    padding: $space-2 $space-3;
+  }
+
+  &__document-editor-title {
+    color: $color-text-muted;
+    font-size: 13px;
+  }
+
+  &__document-editor-tabs {
+    background: rgba(226, 239, 252, 0.82);
+    border: 1px solid rgba(151, 175, 201, 0.42);
+    border-radius: $radius-sm;
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 2px;
+    padding: 2px;
+  }
+
+  &__document-editor-tab {
+    background: transparent;
+    border: 0;
+    border-radius: calc($radius-sm - 2px);
+    color: $color-text-muted;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    min-height: 28px;
+    padding: 0 $space-3;
+
+    &--active {
+      background: #ffffff;
+      box-shadow: 0 2px 8px rgba(30, 64, 105, 0.1);
+      color: $color-primary;
+    }
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+
+  &__markdown-preview {
+    color: $color-text-main;
+    min-height: 430px;
+    overflow-y: auto;
+    padding: $space-4 $space-5 $space-5;
+
+    /* Markdown 内容样式：限制在预览容器内部，避免影响外部页面 */
+    :deep(.module-detail__markdown-body) {
+      color: $color-text-muted;
+      font-size: 14px;
+      line-height: 1.75;
+    }
+
+    :deep(.module-detail__markdown-body > *:first-child) {
+      margin-top: 0;
+    }
+
+    :deep(.module-detail__markdown-body > *:last-child) {
+      margin-bottom: 0;
+    }
+
+    :deep(h1),
+    :deep(h2),
+    :deep(h3),
+    :deep(h4),
+    :deep(h5),
+    :deep(h6) {
+      color: $color-text-main;
+      font-weight: 600;
+      line-height: 1.3;
+      margin: $space-5 0 $space-2;
+    }
+
+    :deep(h1) {
+      font-size: 24px;
+    }
+
+    :deep(h2) {
+      font-size: 21px;
+    }
+
+    :deep(h3) {
+      font-size: 18px;
+    }
+
+    :deep(h4),
+    :deep(h5),
+    :deep(h6) {
+      font-size: 17px;
+    }
+
+    :deep(p),
+    :deep(blockquote),
+    :deep(ul),
+    :deep(ol),
+    :deep(pre),
+    :deep(table) {
+      margin: 0 0 $space-3;
+    }
+
+    :deep(a) {
+      color: $color-primary;
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+
+    :deep(strong) {
+      color: $color-text-main;
+      font-weight: 600;
+    }
+
+    :deep(blockquote) {
+      border-left: 3px solid rgba(2, 132, 199, 0.32);
+      color: $color-text-muted;
+      padding-left: $space-3;
+    }
+
+    :deep(ul),
+    :deep(ol) {
+      padding-left: $space-5;
+    }
+
+    :deep(li + li) {
+      margin-top: 4px;
+    }
+
+    :deep(.module-detail__markdown-task-item) {
+      list-style: none;
+    }
+
+    :deep(.module-detail__markdown-task-checkbox) {
+      accent-color: $color-primary;
+      margin: 0 $space-2 0 0;
+      vertical-align: middle;
+    }
+
+    :deep(hr) {
+      border: 0;
+      border-top: 1px solid $color-border-soft;
+      margin: $space-4 0;
+    }
+
+    :deep(code) {
+      background: #eef6ff;
+      border: 1px solid rgba(183, 204, 228, 0.62);
+      border-radius: 4px;
+      color: #1f3a5a;
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 0.92em;
+      padding: 1px 5px;
+    }
+
+    :deep(pre) {
+      background: #f1f7fd;
+      border: 1px solid $color-border-soft;
+      border-radius: $radius-sm;
+      color: #1f3a5a;
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.65;
+      overflow-x: auto;
+      padding: $space-3;
+      white-space: pre;
+    }
+
+    :deep(pre code) {
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      color: inherit;
+      display: block;
+      font-size: inherit;
+      padding: 0;
+      white-space: inherit;
+    }
+
+    :deep(img) {
+      border: 1px solid $color-border-soft;
+      border-radius: $radius-sm;
+      display: block;
+      height: auto;
+      margin: $space-2 0;
+      max-width: 100%;
+    }
+
+    :deep(table) {
+      border-collapse: collapse;
+      color: $color-text-muted;
+      display: block;
+      font-size: 14px;
+      overflow-x: auto;
+      width: 100%;
+    }
+
+    :deep(th),
+    :deep(td) {
+      border: 1px solid $color-border-soft;
+      line-height: 1.6;
+      min-width: 120px;
+      padding: $space-2 $space-3;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    :deep(th) {
+      background: rgba(241, 247, 253, 0.86);
+      color: $color-text-main;
+      font-weight: 600;
+    }
+
+    :deep(tr:nth-child(even) td) {
+      background: rgba(248, 251, 255, 0.62);
+    }
+  }
+
+  &__markdown-empty {
+    color: $color-text-soft;
+    font-size: 13px;
+    margin: 0;
   }
 }
 
-:deep(.module-detail__password-dialog) {
+:deep(.module-detail__password-dialog),
+:deep(.module-detail__document-dialog),
+:deep(.module-detail__resume-dialog) {
   --el-dialog-bg-color: #f8fbff;
   --el-color-primary: #0284c7;
   --el-border-color: #d3e2f1;
@@ -672,6 +1073,8 @@
   }
 
   .el-dialog__body {
+    max-height: min(64vh, 640px);
+    overflow-y: auto;
     padding: $space-4 $space-5 $space-5;
   }
 
@@ -755,103 +1158,29 @@
   }
 }
 
-:deep(.module-detail__element-drawer) {
-  --el-drawer-bg-color: #f8fbff;
-  --el-color-primary: #0284c7;
-  --el-border-color: #d3e2f1;
-  --el-text-color-primary: #14243a;
-  --el-text-color-regular: #4e6682;
-  box-shadow: -18px 0 42px rgba(30, 64, 105, 0.16);
-  width: min(450px, 92vw) !important;
-
-  .el-drawer__header {
-    border-bottom: 1px solid $color-border-soft;
-    margin-bottom: 0;
-    padding: $space-4 $space-5;
+:deep(.module-detail__document-dialog) {
+  .el-dialog__body {
+    max-height: min(72vh, 760px);
   }
+}
 
-  .el-drawer__body {
-    overflow-y: auto;
-    padding: $space-4 $space-5 $space-5;
-  }
-
-  .el-drawer__footer {
-    background: rgba(248, 251, 255, 0.94);
-    border-top: 1px solid $color-border-soft;
-    padding: $space-3 $space-5;
-  }
-
-  .el-form-item {
-    margin-bottom: 0;
-  }
-
-  .el-form-item__label {
-    color: $color-text-muted;
+:global(.module-detail__login-method-popper) {
+  .el-select-group__title {
+    color: $color-primary;
     font-size: 12px;
     font-weight: 400;
-    line-height: 1.2;
-    margin-bottom: $space-1;
+    padding: $space-2 $space-4 $space-1;
   }
 
-  .el-input__wrapper,
-  .el-select__wrapper {
-    background: transparent;
-    border-radius: 0;
-    box-shadow: inset 0 -1px 0 $color-border;
-    min-height: 36px;
+  .el-select-dropdown__item {
+    font-size: 14px;
+    font-weight: 400;
+    min-height: 34px;
   }
 
-  .el-textarea__inner {
-    background: transparent;
-    border-radius: 0;
-    box-shadow: inset 0 -1px 0 $color-border;
-    font-size: 13px;
-    min-height: 92px !important;
-  }
-
-  .el-input__wrapper:hover,
-  .el-select__wrapper:hover,
-  .el-textarea__inner:hover {
-    box-shadow: inset 0 -1px 0 rgba(2, 132, 199, 0.42);
-  }
-
-  .el-input__wrapper.is-focus,
-  .el-select__wrapper.is-focused,
-  .el-select__wrapper.is-focus,
-  .el-textarea__inner:focus {
-    box-shadow: inset 0 -1px 0 $color-primary;
-  }
-
-  .el-select {
-    width: 100%;
-  }
-
-  .el-input__inner,
-  .el-select__placeholder,
-  .el-select__selected-item {
-    font-size: 13px;
-  }
-
-  .el-input.is-disabled .el-input__inner,
-  .el-textarea.is-disabled .el-textarea__inner,
-  .el-select__wrapper.is-disabled .el-select__selected-item {
-    -webkit-text-fill-color: $color-text-main;
-    color: $color-text-main;
-  }
-
-  .el-input.is-disabled .el-input__wrapper,
-  .el-textarea.is-disabled .el-textarea__inner,
-  .el-select__wrapper.is-disabled {
-    background: transparent;
-    box-shadow: inset 0 -1px 0 rgba(151, 175, 201, 0.82);
-  }
-
-  .module-detail__drawer-form--readonly {
-    .el-input__inner,
-    .el-textarea__inner {
-      cursor: text;
-      user-select: text;
-    }
+  .el-select-dropdown__item.is-selected {
+    color: $color-primary;
+    font-weight: 400;
   }
 }
 
@@ -893,6 +1222,11 @@
       grid-template-columns: 132px minmax(0, 1fr);
     }
 
+    &__document-card-list,
+    &__resume-card-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     &__file-meta {
       grid-column: 2;
       grid-template-columns: repeat(3, max-content);
@@ -930,6 +1264,10 @@
     }
 
     &__file-list,
+    &__document-card-list,
+    &__document-category-grid,
+    &__resume-card-list,
+    &__resume-category-grid,
     &__search,
     &__workspace-tools {
       grid-template-columns: 1fr;
@@ -946,6 +1284,17 @@
 
     &__simple-count {
       display: none;
+    }
+
+    &__document-card,
+    &__resume-card {
+      grid-template-columns: 40px minmax(0, 1fr);
+    }
+
+    &__document-actions,
+    &__resume-actions {
+      grid-column: 2;
+      justify-content: flex-start;
     }
 
     &__file-row,

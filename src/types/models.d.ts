@@ -74,6 +74,8 @@ export interface PasswordFormPayload {
 
 export type DocumentFileType = 'md' | 'txt';
 
+export type ResumeFileType = 'docx' | 'pdf';
+
 export interface FileAssetListItem {
   /** 类型：字符串；含义：文件唯一标识；是否必填：是；默认值：无 */
   id: string;
@@ -120,6 +122,17 @@ export interface DocumentFormPayload {
   originalName: string;
   /** 类型：字符串；含义：文档正文内容；是否必填：否；默认值：空字符串 */
   content: string;
+  /** 类型：字符串；含义：备注；是否必填：否；默认值：空字符串 */
+  remark: string;
+}
+
+export interface ResumeFormPayload {
+  /** 类型：字符串；含义：简历标题；是否必填：是；默认值：空字符串 */
+  title: string;
+  /** 类型：字符串；含义：简历分类；是否必填：否；默认值：通用 */
+  category: string;
+  /** 类型：File；含义：上传的简历文件；是否必填：是；默认值：无 */
+  file: File;
   /** 类型：字符串；含义：备注；是否必填：否；默认值：空字符串 */
   remark: string;
 }

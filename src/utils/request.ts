@@ -8,12 +8,20 @@ import { DEFAULT_USER_ID } from '~/constants/app';
 import type { ApiResponse, CsrfTokenData } from '~/types/api';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+type UploadHttpMethod = Exclude<HttpMethod, 'GET'>;
 
 interface ArchiveRequestOptions {
   /** 类型：HTTP 方法；含义：请求方法；是否必填：否；默认值：GET */
   method?: HttpMethod;
   /** 类型：对象；含义：请求体；是否必填：否；默认值：undefined */
   body?: Record<string, unknown>;
+  /** 类型：对象；含义：查询参数；是否必填：否；默认值：undefined */
+  query?: Record<string, string | number | boolean | undefined>;
+}
+
+interface ArchiveUploadRequestOptions {
+  /** 类型：HTTP 方法；含义：上传请求方法；是否必填：否；默认值：POST */
+  method?: UploadHttpMethod;
   /** 类型：对象；含义：查询参数；是否必填：否；默认值：undefined */
   query?: Record<string, string | number | boolean | undefined>;
 }
@@ -84,5 +92,33 @@ export const request = async <T>(url: string, options: ArchiveRequestOptions = {
       userId,
       ...options.body
     }
+  });
+};
+
+/**
+ * 发起 multipart 文件上传请求
+ * @param url - 接口地址
+ * @param body - FormData 请求体
+ * @param options - 上传请求配置
+ * @returns 统一 API 响应
+ * @throws 当网络请求失败时抛出错误
+ */
+export const uploadRequest = async <T>(url: string, body: FormData, options: ArchiveUploadRequestOptions = {}): Promise<ApiResponse<T>> => {
+  const method = options.method || 'POST';
+  const userId = getArchiveUserId();
+
+  if (!body.has('userId')) {
+    body.append('userId', userId);
+  }
+
+  const csrfToken = await ensureCsrfToken();
+
+  return $fetch<ApiResponse<T>>(url, {
+    method,
+    headers: {
+      'x-csrf-token': csrfToken
+    },
+    query: options.query,
+    body
   });
 };

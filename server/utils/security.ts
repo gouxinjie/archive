@@ -15,12 +15,16 @@ import {
   setCookie,
   type H3Event
 } from 'h3';
+import type { ArchiveModuleKey } from '../../src/types/models';
 import { countUsers, getSetting, getUserByUsername, listArchiveProfiles } from './database';
 
 const MASTER_PASSWORD_KEY = 'master_password_hash';
 const SESSION_COOKIE_NAME = 'archive_session';
 const CSRF_COOKIE_NAME = 'archive_csrf';
 const SESSION_TTL_SECONDS = 60 * 60 * 8;
+export const FILE_PREVIEW_TTL_SECONDS = 60 * 10;
+const FILE_PREVIEW_PURPOSE = 'file-preview';
+const ARCHIVE_MODULE_KEYS: ArchiveModuleKey[] = ['passwords', 'documents', 'resumes', 'images', 'certificates', 'study'];
 
 let developmentSessionSecret: string | null = null;
 
@@ -35,6 +39,22 @@ export interface ArchiveSession {
   profileId: string;
   /** 类型：字符串；含义：当前档案名称；是否必填：是；默认值：无 */
   profileName: string;
+}
+
+export interface FilePreviewTokenInput {
+  /** 类型：字符串；含义：当前档案标识；是否必填：是；默认值：无 */
+  profileId: string;
+  /** 类型：ArchiveModuleKey；含义：文件所属模块；是否必填：是；默认值：无 */
+  module: ArchiveModuleKey;
+  /** 类型：字符串；含义：文件资源标识；是否必填：是；默认值：无 */
+  fileId: string;
+}
+
+export interface FilePreviewTokenPayload extends FilePreviewTokenInput {
+  /** 类型：字符串；含义：令牌用途；是否必填：是；默认值：file-preview */
+  purpose: typeof FILE_PREVIEW_PURPOSE;
+  /** 类型：数字；含义：过期时间戳（秒）；是否必填：是；默认值：当前时间加有效期 */
+  expiresAt: number;
 }
 
 /**
@@ -65,6 +85,52 @@ const getSessionSecret = (): string => {
   }
 
   return developmentSessionSecret;
+};
+
+/**
+ * 获取文件预览签名密钥
+ * @returns 文件预览签名密钥
+ * @throws 生产环境缺少会话密钥时抛出异常
+ */
+const getFilePreviewSecret = (): string => {
+  const secret = process.env.NUXT_FILE_PREVIEW_SECRET;
+
+  if (secret && secret.length >= 32) {
+    return secret;
+  }
+
+  return getSessionSecret();
+};
+
+/**
+ * 判断未知值是否为普通对象
+ * @param value - 未知输入值
+ * @returns 是否为普通对象
+ * @throws 不主动抛出异常
+ */
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
+/**
+ * 判断未知值是否为有效的文件预览令牌载荷
+ * @param value - 未知输入值
+ * @returns 是否为有效文件预览令牌载荷
+ * @throws 不主动抛出异常
+ */
+const isFilePreviewTokenPayload = (value: unknown): value is FilePreviewTokenPayload => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    value.purpose === FILE_PREVIEW_PURPOSE &&
+    typeof value.profileId === 'string' &&
+    typeof value.fileId === 'string' &&
+    typeof value.expiresAt === 'number' &&
+    typeof value.module === 'string' &&
+    ARCHIVE_MODULE_KEYS.includes(value.module as ArchiveModuleKey)
+  );
 };
 
 /**
@@ -175,6 +241,61 @@ export const createSessionToken = (profile: ArchiveSession): string => {
   const payload = Buffer.from(JSON.stringify({ ...profile, expiresAt })).toString('base64url');
   const signature = createHmac('sha256', getSessionSecret()).update(payload).digest('base64url');
   return `${payload}.${signature}`;
+};
+
+/**
+ * 创建文件在线预览短时令牌
+ * @param input - 预览文件定位信息
+ * @returns 签名后的短时预览令牌
+ * @throws 签名失败时抛出异常
+ */
+export const createFilePreviewToken = (input: FilePreviewTokenInput): string => {
+  const expiresAt = Math.floor(Date.now() / 1000) + FILE_PREVIEW_TTL_SECONDS;
+  const payload = Buffer.from(JSON.stringify({ ...input, purpose: FILE_PREVIEW_PURPOSE, expiresAt })).toString('base64url');
+  const signature = createHmac('sha256', getFilePreviewSecret()).update(payload).digest('base64url');
+  return `${payload}.${signature}`;
+};
+
+/**
+ * 校验文件在线预览短时令牌
+ * @param token - 预览令牌
+ * @returns 校验通过后的令牌载荷，失败时返回 null
+ * @throws 不主动抛出异常
+ */
+export const verifyFilePreviewToken = (token: string | undefined): FilePreviewTokenPayload | null => {
+  if (!token) {
+    return null;
+  }
+
+  const [payload, signature] = token.split('.');
+
+  if (!payload || !signature) {
+    return null;
+  }
+
+  const expectedSignature = createHmac('sha256', getFilePreviewSecret()).update(payload).digest('base64url');
+  const expectedBuffer = Buffer.from(expectedSignature);
+  const signatureBuffer = Buffer.from(signature);
+
+  if (expectedBuffer.length !== signatureBuffer.length || !timingSafeEqual(expectedBuffer, signatureBuffer)) {
+    return null;
+  }
+
+  try {
+    const decoded: unknown = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+
+    if (!isFilePreviewTokenPayload(decoded)) {
+      return null;
+    }
+
+    if (decoded.expiresAt <= Math.floor(Date.now() / 1000)) {
+      return null;
+    }
+
+    return decoded;
+  } catch {
+    return null;
+  }
 };
 
 /**

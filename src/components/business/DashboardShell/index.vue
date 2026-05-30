@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @component DashboardShell
- * @description 个人档案工作台布局
+ * @description 个人档案首页仪表盘布局
  * @author Codex
  * @created 2026-05-29
  * @updated 2026-05-30
@@ -68,7 +68,8 @@ const handleOpenModule = (moduleKey: ArchiveModuleKey): void => {
 
 <template>
   <div class="dashboard-shell">
-    <header class="dashboard-shell__topbar">
+    <header class="dashboard-shell__header">
+      <div class="dashboard-shell__topbar">
       <div class="dashboard-shell__brand">
         <span class="dashboard-shell__brand-mark">A</span>
         <span>
@@ -77,19 +78,34 @@ const handleOpenModule = (moduleKey: ArchiveModuleKey): void => {
         </span>
       </div>
 
-      <AppInput
-        v-model="searchKeyword"
-        class="dashboard-shell__search"
-        label="全局搜索"
-        type="search"
-        placeholder="搜索模块、文件、账号或备注"
-      />
+      <div class="dashboard-shell__page-meta">
+        <span class="dashboard-shell__page-kicker">Dashboard</span>
+        <strong class="dashboard-shell__page-title">首页总览</strong>
+      </div>
 
-      <AppButton variant="ghost" @click="emit('lock')">退出登录</AppButton>
-    </header>
+      <div class="dashboard-shell__topbar-actions">
+        <AppInput
+          v-model="searchKeyword"
+          class="dashboard-shell__search"
+          label="全局搜索"
+          type="search"
+          placeholder="搜索模块、文件、账号或备注"
+        />
+        <AppButton class="dashboard-shell__logout-button" variant="ghost" @click="emit('lock')">退出登录</AppButton>
+      </div>
+      </div>
 
-    <nav class="dashboard-shell__module-nav" aria-label="档案模块">
+      <nav class="dashboard-shell__module-nav" aria-label="档案模块">
       <div class="dashboard-shell__module-track">
+        <button
+          class="dashboard-shell__module-tab dashboard-shell__module-tab--active"
+          type="button"
+          aria-current="page"
+        >
+          <span class="dashboard-shell__module-dot dashboard-shell__module-dot--dashboard" />
+          <span>Dashboard</span>
+          <span class="dashboard-shell__module-count">{{ props.loading ? '...' : archiveTotal }}</span>
+        </button>
         <button
           v-for="module in ARCHIVE_MODULES"
           :key="module.key"
@@ -99,16 +115,17 @@ const handleOpenModule = (moduleKey: ArchiveModuleKey): void => {
         >
           <span class="dashboard-shell__module-dot" :class="`dashboard-shell__module-dot--${module.tone}`" />
           <span>{{ module.name }}</span>
-          <span class="dashboard-shell__module-count">{{ moduleCounts[module.key] }}</span>
+          <span class="dashboard-shell__module-count">{{ props.loading ? '...' : moduleCounts[module.key] }}</span>
         </button>
       </div>
-    </nav>
+      </nav>
+    </header>
 
     <main class="dashboard-shell__main">
       <section class="dashboard-shell__overview">
-        <div>
+        <div class="dashboard-shell__overview-content">
           <p class="dashboard-shell__eyebrow">Private Archive</p>
-          <h1 class="dashboard-shell__title">私人资料工作台</h1>
+          <h1 class="dashboard-shell__title">档案仪表盘</h1>
           <p class="dashboard-shell__description">
             管理密码、文档、简历、图片、证件和学习资料。当前账号的数据独立归档。
           </p>
@@ -136,35 +153,52 @@ const handleOpenModule = (moduleKey: ArchiveModuleKey): void => {
       </section>
 
       <section class="dashboard-shell__workspace">
-        <div class="dashboard-shell__upload-area">
+        <section class="dashboard-shell__module-list" aria-label="档案模块概览">
+          <header class="dashboard-shell__section-head">
+            <div>
+              <p class="dashboard-shell__section-kicker">Modules</p>
+              <h2 class="dashboard-shell__section-title">档案模块</h2>
+            </div>
+            <span class="dashboard-shell__section-count">{{ filteredModules.length }} 个模块</span>
+          </header>
+
+          <div class="dashboard-shell__module-grid">
+            <article
+              v-for="module in filteredModules"
+              :key="module.key"
+              class="dashboard-shell__module-row"
+            >
+              <span class="dashboard-shell__module-dot" :class="`dashboard-shell__module-dot--${module.tone}`" />
+              <div class="dashboard-shell__module-info">
+                <h2 class="dashboard-shell__module-title">{{ module.name }}</h2>
+                <p class="dashboard-shell__module-description">{{ module.description }}</p>
+              </div>
+              <strong class="dashboard-shell__module-total">
+                <span v-if="props.loading">...</span>
+                <span v-else>{{ moduleCounts[module.key] }}</span>
+              </strong>
+              <AppButton variant="secondary" @click="handleOpenModule(module.key)">进入</AppButton>
+            </article>
+          </div>
+        </section>
+
+        <aside class="dashboard-shell__upload-area">
+          <header class="dashboard-shell__section-head">
+            <div>
+              <p class="dashboard-shell__section-kicker">Upload</p>
+              <h2 class="dashboard-shell__section-title">快速上传</h2>
+            </div>
+          </header>
+
           <FileDropzone
-            title="快速上传"
+            title="拖拽上传"
             description="拖拽文件到这里，后续会按模块保存到 ECS 本地 uploads 目录"
             @files-selected="handleFilesSelected"
           />
           <p v-if="selectedFiles.length > 0" class="dashboard-shell__upload-tip">
             已选择 {{ selectedFiles.length }} 个文件，上传接口会在模块 CRUD 阶段接入。
           </p>
-        </div>
-
-        <section class="dashboard-shell__module-list" aria-label="档案模块概览">
-          <article
-            v-for="module in filteredModules"
-            :key="module.key"
-            class="dashboard-shell__module-row"
-          >
-            <span class="dashboard-shell__module-dot" :class="`dashboard-shell__module-dot--${module.tone}`" />
-            <div class="dashboard-shell__module-info">
-              <h2 class="dashboard-shell__module-title">{{ module.name }}</h2>
-              <p class="dashboard-shell__module-description">{{ module.description }}</p>
-            </div>
-            <strong class="dashboard-shell__module-total">
-              <span v-if="props.loading">...</span>
-              <span v-else>{{ moduleCounts[module.key] }}</span>
-            </strong>
-            <AppButton variant="secondary" @click="handleOpenModule(module.key)">进入</AppButton>
-          </article>
-        </section>
+        </aside>
       </section>
     </main>
   </div>

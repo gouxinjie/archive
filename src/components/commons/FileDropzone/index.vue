@@ -4,7 +4,7 @@
  * @description 通用拖拽上传区域组件
  * @author Codex
  * @created 2026-05-29
- * @updated 2026-05-29
+ * @updated 2026-05-30
  */
 
 import { ref } from 'vue';
@@ -16,12 +16,15 @@ interface FileDropzoneProps {
   description?: string;
   /** 类型：字符串；含义：input accept 属性；是否必填：否；默认值：空字符串 */
   accept?: string;
+  /** 类型：布尔值；含义：是否允许一次选择多个文件；是否必填：否；默认值：true */
+  multiple?: boolean;
 }
 
 const props = withDefaults(defineProps<FileDropzoneProps>(), {
   title: '拖拽文件到这里',
   description: '支持文档、图片、PDF 和 Markdown',
-  accept: ''
+  accept: '',
+  multiple: true
 });
 
 const emit = defineEmits<{
@@ -68,12 +71,14 @@ const openFilePicker = (): void => {
       <h2 class="archive-dropzone__title">{{ props.title }}</h2>
       <p class="archive-dropzone__description">{{ props.description }}</p>
     </div>
-    <AppButton variant="secondary" @click="openFilePicker">选择文件</AppButton>
+    <button class="archive-dropzone__action" type="button" @click="openFilePicker">
+      选择文件
+    </button>
     <input
       ref="inputRef"
       class="archive-dropzone__input"
       type="file"
-      multiple
+      :multiple="props.multiple"
       :accept="props.accept"
       @change="handleSelect"
     >

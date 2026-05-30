@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
  * @component DashboardShell
- * @description 个人档案主控制台布局
+ * @description 个人档案工作台布局
  * @author Codex
  * @created 2026-05-29
- * @updated 2026-05-29
+ * @updated 2026-05-30
  */
 
 import { computed, ref } from 'vue';
@@ -41,6 +41,10 @@ const moduleCounts = computed<Record<ArchiveModuleConfig['key'], number>>(() => 
   study: props.summary.studyCount
 }));
 
+const archiveTotal = computed<number>(() => {
+  return Object.values(moduleCounts.value).reduce((total, count) => total + count, 0);
+});
+
 const filteredModules = computed<readonly ArchiveModuleConfig[]>(() => {
   const keyword = searchKeyword.value.trim().toLowerCase();
 
@@ -64,79 +68,103 @@ const handleOpenModule = (moduleKey: ArchiveModuleKey): void => {
 
 <template>
   <div class="dashboard-shell">
-    <aside class="dashboard-shell__sidebar">
+    <header class="dashboard-shell__topbar">
       <div class="dashboard-shell__brand">
         <span class="dashboard-shell__brand-mark">A</span>
-        <div>
-          <p class="dashboard-shell__brand-en">{{ APP_ENGLISH_NAME }}</p>
+        <span>
+          <span class="dashboard-shell__brand-en">{{ APP_ENGLISH_NAME }}</span>
           <strong class="dashboard-shell__brand-name">{{ APP_NAME }}</strong>
-        </div>
+        </span>
       </div>
 
-      <nav class="dashboard-shell__nav" aria-label="档案模块">
+      <AppInput
+        v-model="searchKeyword"
+        class="dashboard-shell__search"
+        label="全局搜索"
+        type="search"
+        placeholder="搜索模块、文件、账号或备注"
+      />
+
+      <AppButton variant="ghost" @click="emit('lock')">退出登录</AppButton>
+    </header>
+
+    <nav class="dashboard-shell__module-nav" aria-label="档案模块">
+      <div class="dashboard-shell__module-track">
         <button
           v-for="module in ARCHIVE_MODULES"
           :key="module.key"
-          class="dashboard-shell__nav-item"
+          class="dashboard-shell__module-tab"
           type="button"
           @click="handleOpenModule(module.key)"
         >
-          <span class="dashboard-shell__nav-dot" :class="`dashboard-shell__nav-dot--${module.tone}`" />
+          <span class="dashboard-shell__module-dot" :class="`dashboard-shell__module-dot--${module.tone}`" />
           <span>{{ module.name }}</span>
-          <span class="dashboard-shell__nav-count">{{ moduleCounts[module.key] }}</span>
+          <span class="dashboard-shell__module-count">{{ moduleCounts[module.key] }}</span>
         </button>
-      </nav>
-    </aside>
+      </div>
+    </nav>
 
     <main class="dashboard-shell__main">
-      <header class="dashboard-shell__topbar">
-        <AppInput
-          v-model="searchKeyword"
-          class="dashboard-shell__search"
-          label="全局搜索"
-          type="search"
-          placeholder="搜索模块、文件、账号或备注"
-        />
-        <AppButton variant="ghost" @click="emit('lock')">退出登录</AppButton>
-      </header>
-
-      <section class="dashboard-shell__hero">
+      <section class="dashboard-shell__overview">
         <div>
           <p class="dashboard-shell__eyebrow">Private Archive</p>
-          <h1 class="dashboard-shell__title">冷色调私人资料管理台</h1>
+          <h1 class="dashboard-shell__title">私人资料工作台</h1>
           <p class="dashboard-shell__description">
-            管理密码、文档、简历、图片、证件和学习资料。不同账号的数据会自动隔离。
+            管理密码、文档、简历、图片、证件和学习资料。当前账号的数据独立归档。
           </p>
+        </div>
+
+        <div class="dashboard-shell__stats" aria-label="档案统计">
+          <div class="dashboard-shell__stat">
+            <span class="dashboard-shell__stat-label">归档总量</span>
+            <strong class="dashboard-shell__stat-value">
+              <span v-if="props.loading">...</span>
+              <span v-else>{{ archiveTotal }}</span>
+            </strong>
+          </div>
+          <div class="dashboard-shell__stat">
+            <span class="dashboard-shell__stat-label">密码记录</span>
+            <strong class="dashboard-shell__stat-value">{{ props.loading ? '...' : moduleCounts.passwords }}</strong>
+          </div>
+          <div class="dashboard-shell__stat">
+            <span class="dashboard-shell__stat-label">文件资料</span>
+            <strong class="dashboard-shell__stat-value">
+              {{ props.loading ? '...' : archiveTotal - moduleCounts.passwords }}
+            </strong>
+          </div>
         </div>
       </section>
 
-      <FileDropzone
-        title="快速上传"
-        description="拖拽文件到这里，后续会按模块保存到 ECS 本地 uploads 目录"
-        @files-selected="handleFilesSelected"
-      />
+      <section class="dashboard-shell__workspace">
+        <div class="dashboard-shell__upload-area">
+          <FileDropzone
+            title="快速上传"
+            description="拖拽文件到这里，后续会按模块保存到 ECS 本地 uploads 目录"
+            @files-selected="handleFilesSelected"
+          />
+          <p v-if="selectedFiles.length > 0" class="dashboard-shell__upload-tip">
+            已选择 {{ selectedFiles.length }} 个文件，上传接口会在模块 CRUD 阶段接入。
+          </p>
+        </div>
 
-      <p v-if="selectedFiles.length > 0" class="dashboard-shell__upload-tip">
-        已选择 {{ selectedFiles.length }} 个文件，上传接口会在模块 CRUD 阶段接入。
-      </p>
-
-      <section class="dashboard-shell__grid" aria-label="档案模块概览">
-        <article
-          v-for="module in filteredModules"
-          :key="module.key"
-          class="dashboard-shell__module"
-          :class="`dashboard-shell__module--${module.tone}`"
-        >
-          <div>
-            <p class="dashboard-shell__module-count">
+        <section class="dashboard-shell__module-list" aria-label="档案模块概览">
+          <article
+            v-for="module in filteredModules"
+            :key="module.key"
+            class="dashboard-shell__module-row"
+          >
+            <span class="dashboard-shell__module-dot" :class="`dashboard-shell__module-dot--${module.tone}`" />
+            <div class="dashboard-shell__module-info">
+              <h2 class="dashboard-shell__module-title">{{ module.name }}</h2>
+              <p class="dashboard-shell__module-description">{{ module.description }}</p>
+            </div>
+            <strong class="dashboard-shell__module-total">
               <span v-if="props.loading">...</span>
               <span v-else>{{ moduleCounts[module.key] }}</span>
-            </p>
-            <h2 class="dashboard-shell__module-title">{{ module.name }}</h2>
-            <p class="dashboard-shell__module-description">{{ module.description }}</p>
-          </div>
-          <AppButton variant="secondary" @click="handleOpenModule(module.key)">进入模块</AppButton>
-        </article>
+            </strong>
+            <AppButton variant="secondary" @click="handleOpenModule(module.key)">进入</AppButton>
+          </article>
+        </section>
       </section>
     </main>
   </div>

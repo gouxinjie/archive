@@ -7,6 +7,7 @@ import Database from 'better-sqlite3';
 import type { Database as DatabaseConnection } from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { getLegacyPasswordCategoryEntries, normalizePasswordCategory } from '../../src/constants/passwordCategories';
 
 let databaseConnection: DatabaseConnection | null = null;
 
@@ -190,10 +191,29 @@ const initializeDatabase = (database: DatabaseConnection): void => {
   `);
 
   migratePasswordItemColumns(database);
+  migrateLegacyPasswordCategories(database);
   migrateArchiveProfilesToUsers(database);
   ensureDefaultUsers(database);
   ensureDefaultProfiles(database);
   migrateOwnerDataToProfiles(database);
+};
+
+/**
+ * 迁移历史密码分类
+ * @param database - SQLite 数据库连接
+ * @returns 无返回值
+ * @throws 当迁移失败时抛出异常
+ */
+const migrateLegacyPasswordCategories = (database: DatabaseConnection): void => {
+  const updateCategory = database.prepare(`
+    UPDATE password_items
+    SET category = ?
+    WHERE category = ?
+  `);
+
+  for (const [legacyCategory, normalizedCategory] of getLegacyPasswordCategoryEntries()) {
+    updateCategory.run(normalizedCategory, legacyCategory);
+  }
 };
 
 /**
@@ -439,7 +459,7 @@ export const listPasswordItems = (profileId: string, keyword: string): PasswordI
   const normalizedKeyword = `%${keyword.trim()}%`;
 
   if (!keyword.trim()) {
-    return database
+    const rows = database
       .prepare(`
         SELECT id, title, category, login_url, login_method, account, password, phone, email, remark, updated_at
         FROM password_items
@@ -447,9 +467,14 @@ export const listPasswordItems = (profileId: string, keyword: string): PasswordI
         ORDER BY updated_at DESC
       `)
       .all(profileId) as PasswordItemRow[];
+
+    return rows.map((item) => ({
+      ...item,
+      category: normalizePasswordCategory(item.category)
+    }));
   }
 
-  return database
+  const rows = database
     .prepare(`
       SELECT id, title, category, login_url, login_method, account, password, phone, email, remark, updated_at
       FROM password_items
@@ -458,6 +483,11 @@ export const listPasswordItems = (profileId: string, keyword: string): PasswordI
       ORDER BY updated_at DESC
     `)
     .all(profileId, normalizedKeyword, normalizedKeyword, normalizedKeyword, normalizedKeyword) as PasswordItemRow[];
+
+  return rows.map((item) => ({
+    ...item,
+    category: normalizePasswordCategory(item.category)
+  }));
 };
 
 /**
@@ -479,7 +509,7 @@ export const createPasswordItem = (input: PasswordItemInput): string => {
       input.id,
       input.profileId,
       input.title,
-      input.category,
+      normalizePasswordCategory(input.category),
       input.loginUrl,
       input.loginMethod,
       input.account,
@@ -518,7 +548,7 @@ export const updatePasswordItem = (input: PasswordItemInput): boolean => {
     `)
     .run(
       input.title,
-      input.category,
+      normalizePasswordCategory(input.category),
       input.loginUrl,
       input.loginMethod,
       input.account,

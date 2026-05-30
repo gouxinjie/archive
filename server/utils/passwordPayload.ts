@@ -2,6 +2,8 @@
  * 密码记录请求体解析工具
  */
 
+import { normalizePasswordCategory } from '../../src/constants/passwordCategories';
+
 export interface PasswordRequestBody {
   userId?: unknown;
   title?: unknown;
@@ -57,7 +59,7 @@ export const parsePasswordPayload = (body: PasswordRequestBody): NormalizedPassw
 
   return {
     title,
-    category: normalizeOptionalText(body.category) || '其他',
+    category: normalizePasswordCategory(normalizeOptionalText(body.category)),
     loginUrl: normalizeOptionalText(body.loginUrl),
     loginMethod: normalizeOptionalText(body.loginMethod),
     account: normalizeOptionalText(body.account),

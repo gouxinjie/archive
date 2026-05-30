@@ -123,12 +123,14 @@ const seedProfiles = (database) => {
 };
 
 const passwordItems = [
-  ['seed-password-csdn', 'CSDN 博客', '开发平台', 'https://www.csdn.net', '手机号', '13800000001', 'Archive@csdn2026', '13800000001', 'dev@example.com', '技术文章和评论账号'],
-  ['seed-password-aliyun', '阿里云控制台', '阿里系', 'https://ecs.console.aliyun.com', '邮箱', 'archive@example.com', 'Aliyun@demo2026', '13800000002', 'archive@example.com', 'ECS 和域名控制台'],
-  ['seed-password-wechat', '微信开放平台', '腾讯系', 'https://open.weixin.qq.com', '微信', 'archive-wechat', 'Wechat@demo2026', '13800000003', '', '绑定个人微信号 archive-wechat'],
+  ['seed-password-csdn', 'CSDN 博客', '学习内容', 'https://www.csdn.net', '手机号', '13800000001', 'Archive@csdn2026', '13800000001', 'dev@example.com', '技术文章和评论账号'],
+  ['seed-password-aliyun', '阿里云控制台', '云服务', 'https://ecs.console.aliyun.com', '邮箱', 'archive@example.com', 'Aliyun@demo2026', '13800000002', 'archive@example.com', 'ECS 和域名控制台'],
+  ['seed-password-wechat', '微信开放平台', '社交通讯', 'https://open.weixin.qq.com', '微信', 'archive-wechat', 'Wechat@demo2026', '13800000003', '', '绑定个人微信号 archive-wechat'],
   ['seed-password-github', 'GitHub', '开发平台', 'https://github.com', 'GitHub', 'archive-dev', 'Github@demo2026', '', 'dev@example.com', '代码仓库和部署集成'],
-  ['seed-password-google', 'Google 账号', '谷歌系', 'https://accounts.google.com', '邮箱', 'archive.dev@gmail.com', 'Google@demo2026', '', 'archive.dev@gmail.com', '浏览器同步和开发服务'],
-  ['seed-password-qqmail', 'QQ 邮箱', '腾讯系', 'https://mail.qq.com', 'QQ', '100000001', 'Qqmail@demo2026', '13800000004', '100000001@qq.com', '常用收件邮箱']
+  ['seed-password-google', 'Google 账号', '邮箱账号', 'https://accounts.google.com', '邮箱', 'archive.dev@gmail.com', 'Google@demo2026', '', 'archive.dev@gmail.com', '浏览器同步和开发服务'],
+  ['seed-password-qqmail', 'QQ 邮箱', '邮箱账号', 'https://mail.qq.com', 'QQ', '100000001', 'Qqmail@demo2026', '13800000004', '100000001@qq.com', '常用收件邮箱'],
+  ['seed-password-cmb', '招商银行 App', '银行金融', 'https://www.cmbchina.com', '手机号', '13800000005', 'Bank@demo2026', '13800000005', '', '工资卡与常用银行卡账号'],
+  ['seed-password-steam', 'Steam', '游戏娱乐', 'https://store.steampowered.com', '邮箱', 'game@example.com', 'Steam@demo2026', '', 'game@example.com', '游戏库和社区账号']
 ];
 
 const fileAssets = [

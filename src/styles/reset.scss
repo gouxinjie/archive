@@ -14,6 +14,15 @@ body,
   min-height: 100%;
 }
 
+html {
+  /*
+   * 固定纵向滚动条占位，避免模块切换时因滚动条出现或消失造成页面宽度抖动。
+   * overflow-y: scroll 作为 scrollbar-gutter 的兼容兜底。
+   */
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
 }

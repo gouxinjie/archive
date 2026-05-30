@@ -8,6 +8,7 @@
  */
 
 import { computed, onMounted, ref, watch } from 'vue';
+import { ElMessage } from 'element-plus';
 import EntryGate from '~/components/business/EntryGate/index.vue';
 import ModuleDetailShell from '~/components/business/ModuleDetailShell/index.vue';
 import { useArchiveSession } from '~/composables/useArchiveSession';
@@ -52,9 +53,11 @@ const currentKeyword = ref('');
 const passwordOperationLoading = ref(false);
 const passwordOperationError = ref('');
 const passwordSuccessVersion = ref(0);
+const passwordDeleteSuccessVersion = ref(0);
 const documentOperationLoading = ref(false);
 const documentOperationError = ref('');
 const documentSuccessVersion = ref(0);
+const documentDeleteSuccessVersion = ref(0);
 let moduleRequestSerial = 0;
 const activeModuleLoadSignature = useState<string>('archive-module-active-load-signature', () => '');
 
@@ -67,21 +70,39 @@ const moduleKey = computed<ArchiveModuleKey | null>(() => {
   return found?.key || null;
 });
 
+const hasFreshModuleData = computed<boolean>(() => {
+  return Boolean(
+    moduleDataProfileId.value === currentProfileId.value &&
+    moduleData.value?.module.key === moduleKey.value
+  );
+});
+const canKeepPreviousModuleData = computed<boolean>(() => {
+  return Boolean(
+    loading.value &&
+    moduleDataProfileId.value === currentProfileId.value &&
+    moduleData.value?.module.key === moduleKey.value
+  );
+});
+
 const fallbackModule = computed<ArchiveModuleConfig>(() => {
   return ARCHIVE_MODULES.find((item) => item.key === moduleKey.value) || ARCHIVE_MODULES[0]!;
 });
 
 const currentModule = computed<ArchiveModuleConfig>(() => {
-  if (moduleDataProfileId.value === currentProfileId.value && moduleData.value?.module.key === moduleKey.value) {
-    return moduleData.value.module;
+  const data = moduleData.value;
+
+  if (data && (hasFreshModuleData.value || canKeepPreviousModuleData.value)) {
+    return data.module;
   }
 
   return fallbackModule.value;
 });
 
 const currentItems = computed<PasswordListItem[] | DocumentListItem[] | FileAssetListItem[]>(() => {
-  if (moduleDataProfileId.value === currentProfileId.value && moduleData.value?.module.key === moduleKey.value) {
-    return moduleData.value.items;
+  const data = moduleData.value;
+
+  if (data && (hasFreshModuleData.value || canKeepPreviousModuleData.value)) {
+    return data.items;
   }
 
   return [];
@@ -223,6 +244,10 @@ const handleBackHome = async (): Promise<void> => {
 };
 
 const handleOpenModule = async (targetModuleKey: ArchiveModuleKey): Promise<void> => {
+  if (targetModuleKey !== moduleKey.value) {
+    loading.value = true;
+  }
+
   await navigateTo(`/modules/${targetModuleKey}`);
 };
 
@@ -230,6 +255,7 @@ const handleSavePassword = async (payload: PasswordFormPayload): Promise<void> =
   passwordOperationLoading.value = true;
   passwordOperationError.value = '';
   moduleError.value = '';
+  const successMessage = payload.id ? '密码保存成功' : '密码新增成功';
 
   try {
     const response = await request<{ id: string }>(
@@ -256,6 +282,7 @@ const handleSavePassword = async (payload: PasswordFormPayload): Promise<void> =
     }
 
     passwordSuccessVersion.value += 1;
+    ElMessage.success(successMessage);
     await loadPageData(currentKeyword.value, true);
   } catch (error: unknown) {
     passwordOperationError.value = error instanceof Error ? error.message : '密码记录保存失败';
@@ -280,6 +307,8 @@ const handleDeletePassword = async (id: string): Promise<void> => {
       return;
     }
 
+    passwordDeleteSuccessVersion.value += 1;
+    ElMessage.success('密码删除成功');
     await loadPageData(currentKeyword.value, true);
   } catch (error: unknown) {
     moduleError.value = error instanceof Error ? error.message : '密码记录删除失败';
@@ -293,6 +322,7 @@ const handleSaveDocument = async (payload: DocumentFormPayload): Promise<void> =
   documentOperationLoading.value = true;
   documentOperationError.value = '';
   moduleError.value = '';
+  const successMessage = payload.id ? '文档保存成功' : '文档新增成功';
 
   try {
     const response = await request<{ id: string }>(
@@ -316,6 +346,7 @@ const handleSaveDocument = async (payload: DocumentFormPayload): Promise<void> =
     }
 
     documentSuccessVersion.value += 1;
+    ElMessage.success(successMessage);
     await loadPageData(currentKeyword.value, true);
   } catch (error: unknown) {
     documentOperationError.value = error instanceof Error ? error.message : '文档保存失败';
@@ -340,6 +371,8 @@ const handleDeleteDocument = async (id: string): Promise<void> => {
       return;
     }
 
+    documentDeleteSuccessVersion.value += 1;
+    ElMessage.success('文档删除成功');
     await loadPageData(currentKeyword.value, true);
   } catch (error: unknown) {
     moduleError.value = error instanceof Error ? error.message : '文档删除失败';
@@ -395,9 +428,11 @@ watch(
     :password-operation-loading="passwordOperationLoading"
     :password-operation-error="passwordOperationError"
     :password-success-version="passwordSuccessVersion"
+    :password-delete-success-version="passwordDeleteSuccessVersion"
     :document-operation-loading="documentOperationLoading"
     :document-operation-error="documentOperationError"
     :document-success-version="documentSuccessVersion"
+    :document-delete-success-version="documentDeleteSuccessVersion"
     @lock="handleLock"
     @back-home="handleBackHome"
     @open-module="handleOpenModule"

@@ -1,7 +1,7 @@
 /**
  * 文件说明：模块详情页样式
- * 样式说明：定义固定侧边栏、顶部操作区、搜索区、表格和文件卡片
- * 关键布局说明：桌面端侧边栏固定在视窗内，内容区独立滚动
+ * 样式说明：定义固定顶部栏、横向模块导航、搜索区、条目列表和文件卡片
+ * 关键布局说明：页面采用顶部固定组合导航和单列工作区，内容区随模块切换
  */
 
 @use "~/styles/variables.scss" as *;
@@ -11,26 +11,48 @@
   background:
     linear-gradient(180deg, rgba(59, 130, 246, 0.12), transparent 260px),
     $color-bg-main;
+  align-content: start;
   display: grid;
-  grid-template-columns: 264px minmax(0, 1fr);
+  gap: $space-4;
+  grid-template-rows: max-content auto;
   max-width: 100%;
   min-height: 100vh;
   min-width: 0;
-  overflow-x: hidden;
   overflow-x: clip;
+  padding: 0 0 $space-4;
   width: 100%;
 
-  &__sidebar {
-    background: $color-bg-sidebar;
-    border-right: 1px solid $color-border-soft;
-    display: flex;
-    flex-direction: column;
-    gap: $space-6;
-    height: 100vh;
-    overflow-y: auto;
-    padding: $space-6 $space-4;
+  &__header {
+    align-self: start;
+    background: rgba(248, 251, 255, 0.86);
+    backdrop-filter: blur(18px);
+    border-bottom: 1px solid $color-border-soft;
+    box-sizing: border-box;
+    box-shadow: 0 10px 22px rgba(30, 64, 105, 0.08);
+    display: grid;
+    gap: 0;
+    margin: 0;
+    max-width: none;
+    min-width: 0;
+    overflow: hidden;
     position: sticky;
     top: 0;
+    width: 100%;
+    z-index: 20;
+  }
+
+  &__topbar {
+    align-items: center;
+    box-sizing: border-box;
+    display: grid;
+    gap: $space-4;
+    grid-template-columns: minmax(0, 1fr) auto;
+    height: 64px;
+    margin: 0 auto;
+    max-width: 1280px;
+    min-width: 0;
+    padding: $space-2 0;
+    width: min(calc(100% - 48px), 1280px);
   }
 
   &__brand {
@@ -40,8 +62,15 @@
     color: $color-text-main;
     display: flex;
     gap: $space-3;
-    padding: 0 $space-2;
+    min-width: 0;
+    padding: 0;
     text-align: left;
+  }
+
+  &__brand-copy {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
   }
 
   &__brand-mark {
@@ -50,10 +79,11 @@
     border-radius: $radius-md;
     color: #ffffff;
     display: inline-flex;
-    flex: 0 0 42px;
+    flex: 0 0 38px;
     font-weight: 900;
-    height: 42px;
+    height: 38px;
     justify-content: center;
+    width: 38px;
   }
 
   &__brand-en {
@@ -65,64 +95,140 @@
   }
 
   &__brand-name {
+    @include text-ellipsis;
     display: block;
-    font-size: 18px;
-    margin-top: $space-1;
+    font-size: 16px;
+    margin: 0;
+  }
+
+  &__breadcrumb {
+    align-items: center;
+    color: $color-text-muted;
+    display: flex;
+    gap: $space-2;
+    min-width: 0;
+  }
+
+  &__breadcrumb-separator {
+    color: $color-text-soft;
+    font-size: 14px;
+  }
+
+  &__breadcrumb-current {
+    @include text-ellipsis;
+    color: $color-text-main;
+    display: inline-block;
+    font-size: 14px;
+    max-width: 360px;
+  }
+
+  &__actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: $space-2;
+
+    :deep(.archive-button) {
+      font-size: 13px;
+      min-height: 34px;
+      padding: 0 $space-3;
+    }
   }
 
   &__nav {
-    display: grid;
+    align-items: center;
+    background: rgba(248, 251, 255, 0.54);
+    border-top: 1px solid $color-border-soft;
+    box-sizing: border-box;
+    display: flex;
+    height: 56px;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: $space-2 0;
+    scrollbar-width: none;
+    width: 100%;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  &__nav-track {
+    display: flex;
     gap: $space-2;
+    margin: 0 auto;
+    max-width: 1280px;
+    min-width: max-content;
+    width: min(calc(100% - 48px), 1280px);
   }
 
   &__nav-item {
     align-items: center;
-    background: transparent;
+    background: rgba(255, 255, 255, 0.66);
     border: 1px solid transparent;
     border-radius: $radius-sm;
     color: $color-text-muted;
-    display: grid;
+    display: inline-flex;
     gap: $space-2;
-    grid-template-columns: 10px 1fr auto;
-    min-height: 42px;
+    min-height: 38px;
     padding: 0 $space-3;
-    text-align: left;
+    white-space: nowrap;
 
-    &:hover,
-    &--active {
-      background: rgba(255, 255, 255, 0.58);
+    &:hover {
+      background: #ffffff;
       border-color: rgba(14, 165, 233, 0.24);
       color: $color-text-main;
+    }
+
+    &--active {
+      background: #e6f6ff;
+      border-color: #0284c7;
+      box-shadow:
+        0 0 0 2px rgba(2, 132, 199, 0.12),
+        inset 0 -1px 0 rgba(2, 132, 199, 0.42);
+      color: #0f3656;
+    }
+
+    &:focus-visible {
+      @include focus-ring;
     }
   }
 
   &__nav-dot {
     border-radius: 999px;
+    box-shadow: 0 0 0 3px var(--module-tone-soft);
+    flex: 0 0 8px;
     height: 8px;
     width: 8px;
 
     &--blue {
-      background: #38bdf8;
+      --module-tone-soft: rgba(2, 132, 199, 0.16);
+      background: #0284c7;
     }
 
     &--cyan {
-      background: #22d3ee;
+      --module-tone-soft: rgba(8, 145, 178, 0.16);
+      background: #0891b2;
     }
 
     &--indigo {
-      background: #818cf8;
+      --module-tone-soft: rgba(79, 70, 229, 0.16);
+      background: #4f46e5;
     }
 
     &--teal {
-      background: #2dd4bf;
+      --module-tone-soft: rgba(13, 148, 136, 0.16);
+      background: #0d9488;
     }
 
     &--sky {
-      background: #7dd3fc;
+      --module-tone-soft: rgba(37, 99, 235, 0.16);
+      background: #2563eb;
     }
 
     &--violet {
-      background: #a78bfa;
+      --module-tone-soft: rgba(124, 58, 237, 0.16);
+      background: #7c3aed;
     }
   }
 
@@ -134,68 +240,12 @@
   &__main {
     display: grid;
     gap: $space-3;
-    grid-template-rows: auto 1fr;
+    margin: 0 auto;
     max-width: 100%;
     min-width: 0;
     overflow-x: hidden;
     overflow-x: clip;
-    padding: $space-4;
-  }
-
-  &__topbar {
-    align-items: center;
-    background: rgba(255, 255, 255, 0.66);
-    border: 1px solid $color-border-soft;
-    border-radius: $radius-md;
-    display: flex;
-    gap: $space-3;
-    justify-content: space-between;
-    min-width: 0;
-    min-height: 64px;
-    padding: $space-2 $space-4;
-  }
-
-  &__breadcrumb {
-    align-items: center;
-    color: $color-text-muted;
-    display: flex;
-    gap: $space-2;
-    min-width: 0;
-  }
-
-  &__breadcrumb-link {
-    background: transparent;
-    border: 0;
-    color: $color-accent;
-    font-weight: 800;
-    padding: 0;
-
-    &:focus-visible {
-      @include focus-ring;
-    }
-  }
-
-  &__breadcrumb-separator {
-    color: $color-text-soft;
-  }
-
-  &__breadcrumb-current {
-    @include text-ellipsis;
-    color: $color-text-main;
-    display: inline-block;
-    max-width: 360px;
-  }
-
-  &__actions {
-    display: flex;
-    flex: 0 0 auto;
-    gap: $space-3;
-
-    :deep(.archive-button) {
-      font-size: 13px;
-      min-height: 34px;
-      padding: 0 $space-3;
-    }
+    width: min(calc(100% - 32px), 1280px);
   }
 
   &__intro {
@@ -303,7 +353,7 @@
     border-bottom: 1px solid $color-border-soft;
     display: grid;
     gap: $space-4;
-    grid-template-columns: minmax(0, 1fr) minmax(360px, auto);
+    grid-template-columns: minmax(0, 1fr) minmax(320px, auto);
     min-width: 0;
     padding-bottom: $space-3;
   }
@@ -332,94 +382,135 @@
     }
   }
 
-  &__table-wrap {
-    max-width: 100%;
+  /* 分类分组：用于把同一分类下的条目收束在一个轻量块内。 */
+  &__category-block {
+    display: grid;
+    gap: $space-2;
     min-width: 0;
-    overflow-x: hidden;
-    overflow-y: hidden;
-    width: 100%;
-
-    &--element {
-      border: 1px solid $color-border-soft;
-      border-radius: $radius-md;
-      box-shadow: 0 10px 24px rgba(30, 64, 105, 0.08);
-    }
   }
 
-  &__pagination {
+  &__category-head {
     align-items: center;
     display: flex;
-    justify-content: flex-end;
-    min-height: 36px;
-  }
-
-  &__element-table {
-    --el-table-border-color: #d7e6f5;
-    --el-table-header-bg-color: #edf6ff;
-    --el-table-row-hover-bg-color: #eef8ff;
-    --el-table-text-color: #14243a;
-    --el-table-header-text-color: #4e6682;
-    --el-color-primary: #0284c7;
-    --el-color-primary-light-9: #e6f6ff;
-    border-radius: $radius-md;
-    width: 100%;
-  }
-
-  &__password-cell {
-    align-items: center;
-    display: inline-flex;
     gap: $space-2;
-    min-width: 118px;
+    justify-content: space-between;
+    min-height: 28px;
+    min-width: 0;
+  }
 
-    code {
-      background: rgba(14, 165, 233, 0.08);
-      border: 1px solid rgba(14, 165, 233, 0.16);
-      border-radius: $radius-sm;
-      color: $color-text-main;
-      font-family: "JetBrains Mono", Consolas, monospace;
-      font-size: 12px;
-      padding: 3px $space-2;
+  &__category-title {
+    @include text-ellipsis;
+    color: $color-text-main;
+    font-size: 15px;
+    font-weight: 400;
+    margin: 0;
+  }
+
+  &__category-count {
+    color: $color-text-soft;
+    flex: 0 0 auto;
+    font-size: 12px;
+  }
+
+  /* 条目列表：用于密码和文档模块，保持接近浏览器密码管理器的轻量行布局。 */
+  &__simple-list {
+    background: #ffffff;
+    border: 1px solid $color-border-soft;
+    border-radius: $radius-md;
+    box-shadow: 0 10px 24px rgba(30, 64, 105, 0.08);
+    display: grid;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  &__simple-row {
+    align-items: center;
+    background: transparent;
+    border-bottom: 1px solid $color-border-soft;
+    border-left: 0;
+    border-right: 0;
+    border-top: 0;
+    color: $color-text-main;
+    cursor: pointer;
+    display: grid;
+    gap: $space-3;
+    grid-template-columns: 40px minmax(0, 1fr) max-content 24px;
+    min-height: 62px;
+    padding: $space-2 $space-4;
+    text-align: left;
+    transition:
+      background 160ms ease,
+      color 160ms ease;
+    width: 100%;
+
+    &:last-child {
+      border-bottom: 0;
+    }
+
+    &:hover {
+      background: #f4f9ff;
+    }
+
+    &:focus-visible {
+      @include focus-ring;
     }
   }
 
-  &__platform-cell {
+  &__simple-icon {
+    align-items: center;
+    border-radius: 50%;
+    display: flex;
+    flex: 0 0 36px;
+    font-size: 13px;
+    font-weight: 700;
+    height: 36px;
+    justify-content: center;
+    text-transform: uppercase;
+    width: 36px;
+
+    &--password {
+      background: #e6f7ff;
+      color: #0369a1;
+    }
+
+    &--document {
+      background: #eef6ff;
+      border-radius: $radius-sm;
+      color: #2563eb;
+      font-size: 11px;
+    }
+  }
+
+  &__simple-main {
     display: grid;
     gap: $space-1;
     min-width: 0;
-
-    .module-detail__platform-title {
-      @include text-ellipsis;
-      color: $color-text-main;
-      font-size: 14px;
-      font-weight: 400;
-    }
-
-    span,
-    :deep(.el-link) {
-      justify-content: start;
-      min-width: 0;
-    }
-
-    span,
-    :deep(.el-link__inner) {
-      @include text-ellipsis;
-      color: $color-text-soft;
-      font-size: 12px;
-    }
   }
 
-  &__element-actions {
-    align-items: center;
-    display: flex;
-    gap: $space-1;
-    justify-content: flex-start;
-    white-space: nowrap;
+  &__simple-title {
+    @include text-ellipsis;
+    color: $color-text-main;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.35;
+  }
 
-    .el-button {
-      font-size: 14px;
-      font-weight: 400;
-      padding: 0 $space-1;
-    }
+  &__simple-meta {
+    @include text-ellipsis;
+    color: $color-text-muted;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  &__simple-count {
+    color: $color-text-muted;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  &__simple-arrow {
+    color: $color-text-soft;
+    font-size: 16px;
   }
 
   &__button-icon {
@@ -474,14 +565,6 @@
     height: 28px;
     justify-content: center;
     text-transform: uppercase;
-  }
-
-  &__file-category {
-    @include text-ellipsis;
-    color: $color-primary;
-    font-size: 12px;
-    font-weight: 800;
-    margin: 0;
   }
 
   &__file-content {
@@ -572,59 +655,103 @@
   }
 }
 
-:deep(.module-detail__element-table) {
-  .el-table__cell {
-    padding: 10px 0;
-  }
-
-  .el-table__header th {
-    font-weight: 400;
-  }
-
-  .el-table__body td {
-    font-weight: 400;
-  }
-
-  .el-table__fixed-right::before,
-  .el-table__fixed::before {
-    background-color: $color-border-soft;
-  }
-
-  .el-link {
-    align-items: center;
-    gap: $space-1;
-    font-weight: 400;
-  }
-
-  .el-tag {
-    background: #eaf7ff;
-    border-color: #b9e5fb;
-    color: $color-primary;
-    font-weight: 400;
-  }
-}
-
-:deep(.module-detail__pagination) {
+:deep(.module-detail__password-dialog) {
+  --el-dialog-bg-color: #f8fbff;
   --el-color-primary: #0284c7;
-  --el-pagination-bg-color: rgba(255, 255, 255, 0.72);
-  --el-pagination-button-disabled-bg-color: rgba(226, 232, 240, 0.68);
-  --el-pagination-hover-color: #0284c7;
-  color: $color-text-muted;
+  --el-border-color: #d3e2f1;
+  --el-text-color-primary: #14243a;
+  --el-text-color-regular: #4e6682;
+  border-radius: $radius-md;
+  box-shadow: 0 24px 64px rgba(30, 64, 105, 0.22);
+  max-width: calc(100vw - 32px);
 
-  .el-pagination {
-    --el-pagination-font-size: 13px;
-    gap: $space-1;
+  .el-dialog__header {
+    border-bottom: 1px solid $color-border-soft;
+    margin-right: 0;
+    padding: $space-4 $space-5;
   }
 
-  .el-pagination__total,
-  .el-pagination__sizes {
-    margin-right: $space-1;
+  .el-dialog__body {
+    padding: $space-4 $space-5 $space-5;
   }
 
+  .el-dialog__footer {
+    background: rgba(248, 251, 255, 0.94);
+    border-top: 1px solid $color-border-soft;
+    padding: $space-3 $space-5;
+  }
+
+  .el-form-item {
+    margin-bottom: 0;
+  }
+
+  .el-form-item__label {
+    color: $color-text-muted;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.2;
+    margin-bottom: $space-1;
+  }
+
+  .el-input__wrapper,
   .el-select__wrapper {
-    background: rgba(255, 255, 255, 0.82);
-    box-shadow: 0 0 0 1px $color-border inset;
-    min-height: 30px;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: inset 0 -1px 0 $color-border;
+    min-height: 36px;
+  }
+
+  .el-textarea__inner {
+    background: transparent;
+    border-radius: 0;
+    box-shadow: inset 0 -1px 0 $color-border;
+    font-size: 13px;
+    min-height: 92px !important;
+  }
+
+  .el-input__wrapper:hover,
+  .el-select__wrapper:hover,
+  .el-textarea__inner:hover {
+    box-shadow: inset 0 -1px 0 rgba(2, 132, 199, 0.42);
+  }
+
+  .el-input__wrapper.is-focus,
+  .el-select__wrapper.is-focused,
+  .el-select__wrapper.is-focus,
+  .el-textarea__inner:focus {
+    box-shadow: inset 0 -1px 0 $color-primary;
+  }
+
+  .el-select {
+    width: 100%;
+  }
+
+  .el-input__inner,
+  .el-select__placeholder,
+  .el-select__selected-item {
+    font-size: 13px;
+  }
+
+  .el-input.is-disabled .el-input__inner,
+  .el-textarea.is-disabled .el-textarea__inner,
+  .el-select__wrapper.is-disabled .el-select__selected-item {
+    -webkit-text-fill-color: $color-text-main;
+    color: $color-text-main;
+  }
+
+  .el-input.is-disabled .el-input__wrapper,
+  .el-textarea.is-disabled .el-textarea__inner,
+  .el-select__wrapper.is-disabled {
+    background: transparent;
+    box-shadow: inset 0 -1px 0 rgba(151, 175, 201, 0.82);
+  }
+
+  .module-detail__drawer-form--readonly {
+    .el-input__inner,
+    .el-textarea__inner {
+      cursor: text;
+      user-select: text;
+    }
   }
 }
 
@@ -668,18 +795,31 @@
 
   .el-input__wrapper,
   .el-select__wrapper {
-    background: rgba(255, 255, 255, 0.8);
-    border-radius: $radius-sm;
-    box-shadow: 0 0 0 1px $color-border inset;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: inset 0 -1px 0 $color-border;
     min-height: 36px;
   }
 
   .el-textarea__inner {
-    background: rgba(255, 255, 255, 0.8);
-    border-radius: $radius-sm;
-    box-shadow: 0 0 0 1px $color-border inset;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: inset 0 -1px 0 $color-border;
     font-size: 13px;
     min-height: 92px !important;
+  }
+
+  .el-input__wrapper:hover,
+  .el-select__wrapper:hover,
+  .el-textarea__inner:hover {
+    box-shadow: inset 0 -1px 0 rgba(2, 132, 199, 0.42);
+  }
+
+  .el-input__wrapper.is-focus,
+  .el-select__wrapper.is-focused,
+  .el-select__wrapper.is-focus,
+  .el-textarea__inner:focus {
+    box-shadow: inset 0 -1px 0 $color-primary;
   }
 
   .el-select {
@@ -702,8 +842,16 @@
   .el-input.is-disabled .el-input__wrapper,
   .el-textarea.is-disabled .el-textarea__inner,
   .el-select__wrapper.is-disabled {
-    background: rgba(255, 255, 255, 0.72);
-    box-shadow: 0 0 0 1px rgba(151, 175, 201, 0.82) inset;
+    background: transparent;
+    box-shadow: inset 0 -1px 0 rgba(151, 175, 201, 0.82);
+  }
+
+  .module-detail__drawer-form--readonly {
+    .el-input__inner,
+    .el-textarea__inner {
+      cursor: text;
+      user-select: text;
+    }
   }
 }
 
@@ -720,32 +868,12 @@
   transform: translateY(4px);
 }
 
-.archive-module-content-enter-active,
-.archive-module-content-leave-active {
-  transition:
-    opacity 160ms ease,
-    transform 160ms ease;
-}
-
-.archive-module-content-enter-from,
-.archive-module-content-leave-to {
-  opacity: 0;
-  transform: translateY(4px);
-}
-
 @media (max-width: 1080px) {
   .module-detail {
-    grid-template-columns: 1fr;
-
-    &__sidebar {
-      border-bottom: 1px solid $color-border-soft;
-      border-right: 0;
+    &__topbar {
+      grid-template-columns: 1fr;
       height: auto;
-      position: static;
-    }
-
-    &__nav {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      min-height: 68px;
     }
 
     &__workspace-head {
@@ -776,21 +904,31 @@
 
 @media (max-width: 720px) {
   .module-detail {
+    padding: 0 0 $space-3;
+
+    &__topbar,
+    &__nav-track {
+      width: calc(100% - 24px);
+    }
+
     &__main {
-      padding: $space-4;
+      width: calc(100% - 24px);
     }
 
     &__topbar,
     &__actions {
       align-items: stretch;
-      flex-direction: column;
+    }
+
+    &__actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
     }
 
     &__breadcrumb-current {
       max-width: 220px;
     }
 
-    &__nav,
     &__file-list,
     &__search,
     &__workspace-tools {
@@ -800,6 +938,14 @@
     &__workspace-tools {
       align-items: stretch;
       display: grid;
+    }
+
+    &__simple-row {
+      grid-template-columns: 36px minmax(0, 1fr) 20px;
+    }
+
+    &__simple-count {
+      display: none;
     }
 
     &__file-row,
@@ -815,9 +961,5 @@
       grid-template-columns: 1fr;
     }
 
-    &__pagination {
-      justify-content: flex-start;
-      overflow-x: auto;
-    }
   }
 }

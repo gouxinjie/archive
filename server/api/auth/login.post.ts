@@ -1,16 +1,12 @@
 /**
- * 兼容旧路径的账号登录接口
+ * 账号登录接口
  */
 
 import { defineEventHandler, readBody } from 'h3';
 import { createErrorResponse, createSuccessResponse, getErrorMessage } from '../../utils/apiResponse';
-import {
-  assertCsrfToken,
-  matchUserByCredentials,
-  setSessionCookie
-} from '../../utils/security';
+import { assertCsrfToken, matchUserByCredentials, setSessionCookie } from '../../utils/security';
 
-interface UnlockRequestBody {
+interface LoginRequestBody {
   username?: unknown;
   password?: unknown;
 }
@@ -19,14 +15,14 @@ export default defineEventHandler(async (event) => {
   try {
     assertCsrfToken(event);
 
-    const body = await readBody<UnlockRequestBody>(event);
+    const body = await readBody<LoginRequestBody>(event);
 
     if (typeof body.username !== 'string' || !body.username.trim()) {
       return createErrorResponse('USERNAME_INVALID', '请输入登录账号');
     }
 
-    if (typeof body.password !== 'string') {
-      return createErrorResponse('PASSWORD_INVALID', '请输入登录密码');
+    if (typeof body.password !== 'string' || body.password.length < 6) {
+      return createErrorResponse('PASSWORD_INVALID', '请输入至少 6 位登录密码');
     }
 
     const session = await matchUserByCredentials(body.username, body.password);

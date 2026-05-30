@@ -97,7 +97,7 @@ const handleOpenModule = (moduleKey: ArchiveModuleKey): void => {
           type="search"
           placeholder="搜索模块、文件、账号或备注"
         />
-        <AppButton variant="ghost" @click="emit('lock')">锁屏</AppButton>
+        <AppButton variant="ghost" @click="emit('lock')">退出登录</AppButton>
       </header>
 
       <section class="dashboard-shell__hero">
@@ -105,7 +105,7 @@ const handleOpenModule = (moduleKey: ArchiveModuleKey): void => {
           <p class="dashboard-shell__eyebrow">Private Archive</p>
           <h1 class="dashboard-shell__title">冷色调私人资料管理台</h1>
           <p class="dashboard-shell__description">
-            管理密码、文档、简历、图片、证件和学习资料。第一版先完成单人解锁、基础表结构和文件入口。
+            管理密码、文档、简历、图片、证件和学习资料。不同账号的数据会自动隔离。
           </p>
         </div>
       </section>

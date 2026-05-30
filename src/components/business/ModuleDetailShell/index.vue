@@ -587,7 +587,7 @@ watch(
         </div>
         <div class="module-detail__actions">
           <AppButton variant="ghost" @click="emit('backHome')">返回首页</AppButton>
-          <AppButton variant="ghost" @click="emit('lock')">锁屏</AppButton>
+          <AppButton variant="ghost" @click="emit('lock')">退出登录</AppButton>
         </div>
       </header>
 

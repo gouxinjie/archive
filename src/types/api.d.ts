@@ -25,8 +25,14 @@ export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
 export interface AuthStatusData {
   /** 类型：布尔值；含义：是否已经设置个人密码；是否必填：是；默认值：false */
   hasPassword: boolean;
-  /** 类型：布尔值；含义：当前访问是否已解锁；是否必填：是；默认值：false */
+  /** 类型：布尔值；含义：当前访问是否已登录；是否必填：是；默认值：false */
   authenticated: boolean;
+  /** 类型：字符串或 null；含义：当前登录用户标识；是否必填：否；默认值：null */
+  userId?: string | null;
+  /** 类型：字符串或 null；含义：当前登录账号；是否必填：否；默认值：null */
+  username?: string | null;
+  /** 类型：字符串或 null；含义：当前用户显示名称；是否必填：否；默认值：null */
+  displayName?: string | null;
   /** 类型：字符串或 null；含义：当前档案标识；是否必填：否；默认值：null */
   profileId?: string | null;
   /** 类型：字符串或 null；含义：当前档案名称；是否必填：否；默认值：null */

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
  * @component EntryGate
- * @description 个人档案入口密码面板
+ * @description 个人档案账号登录面板
  * @author Codex
  * @created 2026-05-29
- * @updated 2026-05-29
+ * @updated 2026-05-30
  */
 
 import { computed, ref } from 'vue';
@@ -13,8 +13,6 @@ import AppInput from '~/components/commons/AppInput/index.vue';
 import { APP_ENGLISH_NAME, APP_NAME } from '~/constants/app';
 
 interface EntryGateProps {
-  /** 类型：布尔值；含义：是否需要首次设置密码；是否必填：是；默认值：false */
-  needsSetup: boolean;
   /** 类型：布尔值；含义：是否加载中；是否必填：是；默认值：false */
   loading: boolean;
   /** 类型：字符串；含义：外部错误信息；是否必填：否；默认值：空字符串 */
@@ -26,31 +24,29 @@ const props = withDefaults(defineProps<EntryGateProps>(), {
 });
 
 const emit = defineEmits<{
-  setup: [password: string];
-  unlock: [password: string];
+  login: [username: string, password: string];
 }>();
 
+const username = ref('xinjie');
 const password = ref('');
 const localError = ref('');
 
-const title = computed<string>(() => (props.needsSetup ? '设置个人密码' : '输入档案密码'));
-const buttonText = computed<string>(() => (props.needsSetup ? '创建并进入' : '进入档案'));
 const visibleError = computed<string>(() => localError.value || props.errorMessage);
 
 const submit = (): void => {
   localError.value = '';
 
+  if (!username.value.trim()) {
+    localError.value = '请输入登录账号';
+    return;
+  }
+
   if (password.value.trim().length < 6) {
-    localError.value = '档案密码至少需要 6 位';
+    localError.value = '登录密码至少需要 6 位';
     return;
   }
 
-  if (props.needsSetup) {
-    emit('setup', password.value);
-    return;
-  }
-
-  emit('unlock', password.value);
+  emit('login', username.value, password.value);
 };
 </script>
 
@@ -67,16 +63,22 @@ const submit = (): void => {
 
       <form class="entry-gate__form" @submit.prevent="submit">
         <AppInput
+          v-model="username"
+          label="账号登录"
+          type="text"
+          placeholder="请输入账号，例如 xinjie"
+        />
+        <AppInput
           v-model="password"
-          :label="title"
+          label="登录密码"
           type="password"
-          placeholder="输入档案密码后直接进入对应档案"
+          placeholder="请输入账号密码"
           :error="visibleError"
         />
-        <p v-if="!props.needsSetup" class="entry-gate__demo-tip">
-          演示档案密码：<strong>123456</strong>
+        <p class="entry-gate__demo-tip">
+          演示账号：<strong>demo</strong> / <strong>123456</strong>
         </p>
-        <AppButton type="submit" :loading="props.loading">{{ buttonText }}</AppButton>
+        <AppButton type="submit" :loading="props.loading">登录</AppButton>
       </form>
     </section>
   </main>

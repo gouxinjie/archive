@@ -24,6 +24,14 @@ export interface ArchiveProfileRow {
   password_hash: string;
 }
 
+export interface UserRow {
+  id: string;
+  username: string;
+  display_name: string;
+  password_hash: string;
+  status: string;
+}
+
 export interface PasswordItemRow {
   id: string;
   title: string;
@@ -133,6 +141,17 @@ const initializeDatabase = (database: DatabaseConnection): void => {
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- 用户表：使用账号密码登录，不同用户的数据通过 user_id 隔离
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      display_name TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
     -- 密码资料表：保存平台账号、登录方式、密码和备注
     CREATE TABLE IF NOT EXISTS password_items (
       id TEXT PRIMARY KEY,
@@ -171,6 +190,8 @@ const initializeDatabase = (database: DatabaseConnection): void => {
   `);
 
   migratePasswordItemColumns(database);
+  migrateArchiveProfilesToUsers(database);
+  ensureDefaultUsers(database);
   ensureDefaultProfiles(database);
   migrateOwnerDataToProfiles(database);
 };
@@ -191,6 +212,57 @@ const migratePasswordItemColumns = (database: DatabaseConnection): void => {
 
   if (!columnNames.has('email')) {
     database.exec('ALTER TABLE password_items ADD COLUMN email TEXT');
+  }
+};
+
+/**
+ * 将历史档案配置迁移为用户账号
+ * @param database - SQLite 数据库连接
+ * @returns 无返回值
+ * @throws 当迁移失败时抛出异常
+ */
+const migrateArchiveProfilesToUsers = (database: DatabaseConnection): void => {
+  const profiles = database.prepare('SELECT id, name, password_hash FROM archive_profiles').all() as ArchiveProfileRow[];
+  const insertUser = database.prepare(`
+    INSERT INTO users (id, username, display_name, password_hash, status, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO NOTHING
+  `);
+
+  for (const profile of profiles) {
+    insertUser.run(profile.id, profile.id === 'personal' ? 'xinjie' : profile.id, profile.name, profile.password_hash);
+  }
+};
+
+/**
+ * 初始化默认用户账号
+ * @param database - SQLite 数据库连接
+ * @returns 无返回值
+ * @throws 当写入失败时抛出异常
+ */
+const ensureDefaultUsers = (database: DatabaseConnection): void => {
+  const personalPassword = process.env.NUXT_PERSONAL_ACCOUNT_PASSWORD || process.env.NUXT_PERSONAL_ARCHIVE_PASSWORD || 'xinjie123';
+  const demoPassword = process.env.NUXT_DEMO_ACCOUNT_PASSWORD || process.env.NUXT_DEMO_ARCHIVE_PASSWORD || '123456';
+  const insertUser = database.prepare(`
+    INSERT INTO users (id, username, display_name, password_hash, status, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO NOTHING
+  `);
+  const updateUserPassword = database.prepare(`
+    UPDATE users
+    SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+
+  insertUser.run('personal', 'xinjie', '个人档案', bcrypt.hashSync(personalPassword, 12));
+  insertUser.run('demo', 'demo', '演示账号', bcrypt.hashSync(demoPassword, 12));
+
+  if (process.env.NUXT_PERSONAL_ACCOUNT_PASSWORD || process.env.NUXT_PERSONAL_ARCHIVE_PASSWORD) {
+    updateUserPassword.run(bcrypt.hashSync(personalPassword, 12), 'personal');
+  }
+
+  if (process.env.NUXT_DEMO_ACCOUNT_PASSWORD || process.env.NUXT_DEMO_ARCHIVE_PASSWORD) {
+    updateUserPassword.run(bcrypt.hashSync(demoPassword, 12), 'demo');
   }
 };
 
@@ -290,6 +362,44 @@ export const listArchiveProfiles = (): ArchiveProfileRow[] => {
   return database
     .prepare('SELECT id, name, password_hash FROM archive_profiles ORDER BY created_at ASC')
     .all() as ArchiveProfileRow[];
+};
+
+/**
+ * 查询所有用户账号
+ * @returns 用户账号列表
+ * @throws 当查询失败时抛出异常
+ */
+export const listUsers = (): UserRow[] => {
+  const database = getDatabase();
+  return database
+    .prepare('SELECT id, username, display_name, password_hash, status FROM users ORDER BY created_at ASC')
+    .all() as UserRow[];
+};
+
+/**
+ * 按账号查询用户
+ * @param username - 登录账号
+ * @returns 用户账号，不存在时返回 null
+ * @throws 当查询失败时抛出异常
+ */
+export const getUserByUsername = (username: string): UserRow | null => {
+  const database = getDatabase();
+  const row = database
+    .prepare('SELECT id, username, display_name, password_hash, status FROM users WHERE username = ?')
+    .get(username) as UserRow | undefined;
+
+  return row || null;
+};
+
+/**
+ * 统计用户账号数量
+ * @returns 用户账号数量
+ * @throws 当查询失败时抛出异常
+ */
+export const countUsers = (): number => {
+  const database = getDatabase();
+  const row = database.prepare('SELECT COUNT(*) AS total FROM users').get() as CountRow;
+  return row.total;
 };
 
 /**

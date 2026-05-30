@@ -58,7 +58,7 @@ const documentSuccessVersion = ref(0);
 let moduleRequestSerial = 0;
 const activeModuleLoadSignature = useState<string>('archive-module-active-load-signature', () => '');
 
-const currentProfileId = computed<string | null>(() => session.status.value.profileId || null);
+const currentProfileId = computed<string | null>(() => session.status.value.userId || session.status.value.profileId || null);
 
 const moduleKey = computed<ArchiveModuleKey | null>(() => {
   const value = route.params.module;
@@ -209,12 +209,8 @@ const resetArchiveModuleCache = (): void => {
   activeModuleLoadSignature.value = '';
 };
 
-const handleSetup = async (password: string): Promise<void> => {
-  await session.setupPassword(password);
-};
-
-const handleUnlock = async (password: string): Promise<void> => {
-  await session.unlock(password);
+const handleLogin = async (username: string, password: string): Promise<void> => {
+  await session.login(username, password);
 };
 
 const handleLock = async (): Promise<void> => {
@@ -385,11 +381,9 @@ watch(
   </div>
   <EntryGate
     v-else-if="!session.authenticated.value"
-    :needs-setup="session.needsSetup.value"
     :loading="session.loading.value"
     :error-message="session.errorMessage.value"
-    @setup="handleSetup"
-    @unlock="handleUnlock"
+    @login="handleLogin"
   />
   <ModuleDetailShell
     v-else

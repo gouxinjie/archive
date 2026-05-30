@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @component HomePage
- * @description 个人档案首页，负责解锁状态和首页统计数据
+ * @description 个人档案首页，负责登录状态和首页统计数据
  * @author Codex
  * @created 2026-05-29
  * @updated 2026-05-29
@@ -42,12 +42,8 @@ const loadSummary = async (): Promise<void> => {
   }
 };
 
-const handleSetup = async (password: string): Promise<void> => {
-  await session.setupPassword(password);
-};
-
-const handleUnlock = async (password: string): Promise<void> => {
-  await session.unlock(password);
+const handleLogin = async (username: string, password: string): Promise<void> => {
+  await session.login(username, password);
 };
 
 const handleLock = async (): Promise<void> => {
@@ -78,11 +74,9 @@ watch(
   </div>
   <EntryGate
     v-else-if="!session.authenticated.value"
-    :needs-setup="session.needsSetup.value"
     :loading="session.loading.value"
     :error-message="session.errorMessage.value"
-    @setup="handleSetup"
-    @unlock="handleUnlock"
+    @login="handleLogin"
   />
   <DashboardShell
     v-else

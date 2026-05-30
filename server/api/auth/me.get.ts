@@ -1,5 +1,5 @@
 /**
- * 查询个人档案登录状态接口
+ * 查询当前登录用户接口
  */
 
 import { defineEventHandler, getCookie } from 'h3';
@@ -21,6 +21,6 @@ export default defineEventHandler((event) => {
     });
   } catch (error: unknown) {
     console.error(getErrorMessage(error));
-    return createErrorResponse('AUTH_STATUS_FAILED', getErrorMessage(error));
+    return createErrorResponse('AUTH_ME_FAILED', getErrorMessage(error));
   }
 });

@@ -37,6 +37,9 @@ export default defineEventHandler(async (event) => {
     const hashedPassword = await hashPassword(body.password);
     setSetting(getMasterPasswordSettingKey(), hashedPassword);
     setSessionCookie(event, {
+      userId,
+      username: userId,
+      displayName: '个人档案',
       profileId: userId,
       profileName: '个人档案'
     });

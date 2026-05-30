@@ -15,7 +15,7 @@ import {
   setCookie,
   type H3Event
 } from 'h3';
-import { getSetting, listArchiveProfiles } from './database';
+import { countUsers, getSetting, getUserByUsername, listArchiveProfiles } from './database';
 
 const MASTER_PASSWORD_KEY = 'master_password_hash';
 const SESSION_COOKIE_NAME = 'archive_session';
@@ -25,6 +25,12 @@ const SESSION_TTL_SECONDS = 60 * 60 * 8;
 let developmentSessionSecret: string | null = null;
 
 export interface ArchiveSession {
+  /** 类型：字符串；含义：当前登录用户标识；是否必填：是；默认值：无 */
+  userId: string;
+  /** 类型：字符串；含义：当前登录账号；是否必填：是；默认值：无 */
+  username: string;
+  /** 类型：字符串；含义：当前用户显示名称；是否必填：是；默认值：无 */
+  displayName: string;
   /** 类型：字符串；含义：当前档案标识；是否必填：是；默认值：无 */
   profileId: string;
   /** 类型：字符串；含义：当前档案名称；是否必填：是；默认值：无 */
@@ -139,7 +145,7 @@ export const verifyPassword = async (password: string, hashedPassword: string): 
  * @throws 当数据库查询失败时抛出异常
  */
 export const hasMasterPassword = (): boolean => {
-  return listArchiveProfiles().length > 0 || Boolean(getSetting(MASTER_PASSWORD_KEY));
+  return countUsers() > 0 || listArchiveProfiles().length > 0 || Boolean(getSetting(MASTER_PASSWORD_KEY));
 };
 
 /**
@@ -199,6 +205,8 @@ export const verifySessionToken = (token: string | undefined): ArchiveSession | 
   try {
     const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
       userId?: unknown;
+      username?: unknown;
+      displayName?: unknown;
       profileId?: unknown;
       profileName?: unknown;
       expiresAt?: unknown;
@@ -212,17 +220,35 @@ export const verifySessionToken = (token: string | undefined): ArchiveSession | 
       return null;
     }
 
+    if (typeof decoded.userId === 'string' && typeof decoded.username === 'string' && typeof decoded.displayName === 'string') {
+      return {
+        userId: decoded.userId,
+        username: decoded.username,
+        displayName: decoded.displayName,
+        profileId: typeof decoded.profileId === 'string' ? decoded.profileId : decoded.userId,
+        profileName: typeof decoded.profileName === 'string' ? decoded.profileName : decoded.displayName
+      };
+    }
+
     if (typeof decoded.profileId === 'string' && typeof decoded.profileName === 'string') {
       return {
+        userId: decoded.profileId,
+        username: decoded.profileId === 'personal' ? 'xinjie' : decoded.profileId,
+        displayName: decoded.profileName,
         profileId: decoded.profileId,
         profileName: decoded.profileName
       };
     }
 
     if (typeof decoded.userId === 'string') {
+      const displayName = decoded.userId === 'demo' ? '演示账号' : '个人档案';
+
       return {
+        userId: decoded.userId,
+        username: decoded.userId === 'personal' ? 'xinjie' : decoded.userId,
+        displayName,
         profileId: decoded.userId,
-        profileName: decoded.userId === 'demo' ? '演示档案' : '个人档案'
+        profileName: displayName
       };
     }
 
@@ -266,9 +292,9 @@ export const clearSessionCookie = (event: H3Event): void => {
 };
 
 /**
- * 判断请求是否已经解锁
+ * 判断请求是否已经登录
  * @param event - H3 请求事件
- * @returns 是否已解锁
+ * @returns 是否已登录
  * @throws 不抛出异常
  */
 export const isAuthenticated = (event: H3Event): boolean => {
@@ -276,42 +302,54 @@ export const isAuthenticated = (event: H3Event): boolean => {
 };
 
 /**
- * 断言请求已经解锁
+ * 断言请求已经登录
  * @param event - H3 请求事件
  * @returns 当前档案会话
- * @throws 当未解锁时抛出异常
+ * @throws 当未登录时抛出异常
  */
 export const assertAuthenticated = (event: H3Event): ArchiveSession => {
   const session = verifySessionToken(getCookie(event, SESSION_COOKIE_NAME));
 
   if (!session) {
-    throw new Error('请先输入档案密码');
+    throw new Error('请先登录账号');
   }
 
   return session;
 };
 
 /**
- * 按密码匹配档案
- * @param password - 用户输入的档案密码
- * @returns 匹配到的档案会话，未匹配时返回 null
+ * 按账号和密码匹配用户
+ * @param username - 登录账号
+ * @param password - 登录密码
+ * @returns 匹配到的用户会话，未匹配时返回 null
  * @throws 当密码校验失败时抛出异常
  */
-export const matchArchiveProfileByPassword = async (password: string): Promise<ArchiveSession | null> => {
-  const profiles = listArchiveProfiles();
+export const matchUserByCredentials = async (username: string, password: string): Promise<ArchiveSession | null> => {
+  const normalizedUsername = username.trim();
 
-  for (const profile of profiles) {
-    const matched = await verifyPassword(password, profile.password_hash);
-
-    if (matched) {
-      return {
-        profileId: profile.id,
-        profileName: profile.name
-      };
-    }
+  if (!normalizedUsername) {
+    return null;
   }
 
-  return null;
+  const user = getUserByUsername(normalizedUsername);
+
+  if (!user || user.status !== 'active') {
+    return null;
+  }
+
+  const matched = await verifyPassword(password, user.password_hash);
+
+  if (!matched) {
+    return null;
+  }
+
+  return {
+    userId: user.id,
+    username: user.username,
+    displayName: user.display_name,
+    profileId: user.id,
+    profileName: user.display_name
+  };
 };
 
 /**

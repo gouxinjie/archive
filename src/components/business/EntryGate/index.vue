@@ -4,13 +4,18 @@
  * @description 个人档案账号登录面板
  * @author Codex
  * @created 2026-05-29
- * @updated 2026-05-30
+ * @updated 2026-05-31
  */
 
 import { computed, ref } from 'vue';
+import {
+  FolderOpened,
+  Lock,
+  User,
+  View
+} from '@element-plus/icons-vue';
 import AppButton from '~/components/commons/AppButton/index.vue';
-import AppInput from '~/components/commons/AppInput/index.vue';
-import { APP_ENGLISH_NAME, APP_NAME } from '~/constants/app';
+import { APP_NAME } from '~/constants/app';
 
 interface EntryGateProps {
   /** 类型：布尔值；含义：是否加载中；是否必填：是；默认值：false */
@@ -27,8 +32,8 @@ const emit = defineEmits<{
   login: [username: string, password: string];
 }>();
 
-const username = ref('xinjie');
-const password = ref('');
+const username = ref('demo');
+const password = ref('123456');
 const localError = ref('');
 
 const visibleError = computed<string>(() => localError.value || props.errorMessage);
@@ -52,34 +57,74 @@ const submit = (): void => {
 
 <template>
   <main class="entry-gate">
-    <section class="entry-gate__panel">
-      <div class="entry-gate__brand">
-        <span class="entry-gate__brand-mark">A</span>
-        <div>
-          <p class="entry-gate__eyebrow">{{ APP_ENGLISH_NAME }}</p>
-          <h1 class="entry-gate__title">{{ APP_NAME }}</h1>
+    <section class="entry-gate__layout" aria-label="个人档案登录">
+      <section class="entry-gate__hero" aria-label="个人档案介绍">
+        <div class="entry-gate__brand">
+          <span class="entry-gate__brand-mark" aria-hidden="true">
+            <FolderOpened />
+          </span>
+          <strong class="entry-gate__brand-name">{{ APP_NAME }}</strong>
         </div>
-      </div>
 
-      <form class="entry-gate__form" @submit.prevent="submit">
-        <AppInput
-          v-model="username"
-          label="账号登录"
-          type="text"
-          placeholder="请输入账号，例如 xinjie"
-        />
-        <AppInput
-          v-model="password"
-          label="登录密码"
-          type="password"
-          placeholder="请输入账号密码"
-          :error="visibleError"
-        />
-        <p class="entry-gate__demo-tip">
-          演示账号：<strong>demo</strong> / <strong>123456</strong>
-        </p>
-        <AppButton type="submit" :loading="props.loading">登录</AppButton>
-      </form>
+        <div class="entry-gate__hero-copy">
+          <h1 class="entry-gate__title">
+            生活负责流动，<br>我负责打捞<span class="entry-gate__title-dot" aria-hidden="true" />
+          </h1>
+          <span class="entry-gate__title-line" aria-hidden="true" />
+          <p class="entry-gate__description">所有重要的信息，都值得被妥善保存</p>
+        </div>
+      </section>
+
+      <section class="entry-gate__login-area" aria-label="登录表单">
+        <div class="entry-gate__panel">
+          <div class="entry-gate__panel-icon" aria-hidden="true">
+            <FolderOpened />
+          </div>
+
+          <header class="entry-gate__panel-head">
+            <h2 class="entry-gate__panel-title">欢迎回来</h2>
+            <p class="entry-gate__panel-subtitle">登录你的个人档案</p>
+            <span class="entry-gate__wave" aria-hidden="true" />
+          </header>
+
+          <form class="entry-gate__form" @submit.prevent="submit">
+            <label class="entry-gate__field">
+              <span class="entry-gate__field-label">账号</span>
+              <span class="entry-gate__field-shell">
+                <User class="entry-gate__field-icon" aria-hidden="true" />
+                <input
+                  v-model="username"
+                  class="entry-gate__input"
+                  type="text"
+                  autocomplete="username"
+                  placeholder="手机号 / 邮箱 / 账号"
+                >
+              </span>
+            </label>
+
+            <label class="entry-gate__field">
+              <span class="entry-gate__field-label">密码</span>
+              <span class="entry-gate__field-shell">
+                <Lock class="entry-gate__field-icon" aria-hidden="true" />
+                <input
+                  v-model="password"
+                  class="entry-gate__input"
+                  type="password"
+                  autocomplete="current-password"
+                  placeholder="请输入密码"
+                >
+                <View class="entry-gate__field-icon entry-gate__field-icon--trail" aria-hidden="true" />
+              </span>
+            </label>
+
+            <p v-if="visibleError" class="entry-gate__error">{{ visibleError }}</p>
+
+            <AppButton type="submit" :loading="props.loading">登 录</AppButton>
+          </form>
+        </div>
+
+        <p class="entry-gate__copyright">© 2026 {{ APP_NAME }} · 记录生活，沉淀自己</p>
+      </section>
     </section>
   </main>
 </template>

@@ -1,84 +1,414 @@
 /**
  * 文件说明：个人档案入口页样式
- * 样式说明：定义浅蓝背景、白色登录面板、品牌区域和表单布局
- * 关键布局说明：入口页使用全屏居中卡片，保持与参考图一致的蓝白主题
+ * 样式说明：以本地背景图为整页底图，还原参考登录页的蓝白玻璃质感
+ * 关键布局说明：桌面端左侧承载品牌文案，右侧使用半透明模糊层承载登录卡片
  */
 
 @use "~/styles/variables.scss" as *;
 @use "~/styles/mixins.scss" as *;
 
 .entry-gate {
-  background:
-    radial-gradient(circle at 72% 18%, rgba(90, 142, 255, 0.14), transparent 26%),
-    linear-gradient(180deg, #f7fbff 0%, $color-bg-main 58%, #f8fbff 100%);
-  display: grid;
-  min-height: 100vh;
-  padding: $space-6;
-  place-items: center;
+  background: #eaf3ff;
+  color: #17345d;
+  height: 100dvh;
+  isolation: isolate;
+  overflow: hidden;
+  position: relative;
 
-  &__panel {
-    @include panel-surface;
-    background: #ffffff;
-    max-width: 420px;
-    padding: $space-8;
-    width: min(100%, 420px);
+  &::before {
+    background: url("~/assets/images/entry-background-login.png") center / cover no-repeat;
+    content: "";
+    inset: 0;
+    position: absolute;
+    z-index: -2;
+  }
+
+  &::after {
+    background:
+      linear-gradient(90deg, rgba(234, 242, 252, 0.1) 0%, rgba(234, 242, 252, 0.04) 44%, rgba(235, 244, 255, 0.28) 100%),
+      radial-gradient(circle at 78% 50%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.14) 34%, transparent 66%);
+    content: "";
+    inset: 0;
+    position: absolute;
+    z-index: -1;
+  }
+
+  &__layout {
+    display: grid;
+    height: 100%;
+    grid-template-columns: 49.5% 50.5%;
+    min-height: 0;
+    position: relative;
+    z-index: 0;
+  }
+
+  &__hero {
+    min-width: 0;
+    padding: 38px 48px 54px 57px;
+    position: relative;
   }
 
   &__brand {
     align-items: center;
-    display: flex;
-    gap: $space-3;
-    margin-bottom: $space-8;
+    display: inline-flex;
+    gap: 14px;
+  }
+
+  &__brand-mark,
+  &__panel-icon {
+    align-items: center;
+    background: linear-gradient(135deg, #5d93ff 0%, #4467f0 100%);
+    color: #ffffff;
+    display: inline-flex;
+    justify-content: center;
+
+    svg {
+      height: 58%;
+      width: 58%;
+    }
   }
 
   &__brand-mark {
-    align-items: center;
-    background: linear-gradient(135deg, #5b8cff 0%, $color-primary 100%);
-    border-radius: 8px;
-    box-shadow: 0 8px 18px rgba(47, 107, 255, 0.2);
-    color: #ffffff;
-    display: inline-flex;
-    font-size: 22px;
-    font-weight: 900;
-    height: 48px;
-    justify-content: center;
-    width: 48px;
+    border-radius: 4px;
+    box-shadow: 0 8px 18px rgba(37, 78, 144, 0.18);
+    height: 26px;
+    width: 26px;
   }
 
-  &__eyebrow {
-    color: $color-primary;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0;
-    margin: 0 0 $space-1;
+  &__brand-name {
+    color: #173963;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+  }
+
+  &__hero-copy {
+    margin: 92px 0 0 42px;
+    max-width: 455px;
   }
 
   &__title {
-    color: $color-text-main;
-    font-size: 26px;
-    font-weight: 800;
-    line-height: 1.2;
+    color: #183963;
+    font-size: 34px;
+    font-weight: 900;
+    letter-spacing: 0;
+    line-height: 1.28;
     margin: 0;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.38);
+  }
+
+  &__title-dot {
+    background: #5c82ff;
+    border-radius: 999px;
+    display: inline-block;
+    height: 7px;
+    margin-left: 8px;
+    vertical-align: 2px;
+    width: 7px;
+  }
+
+  &__title-line {
+    background: linear-gradient(90deg, #4d7fff 0%, rgba(77, 127, 255, 0.12) 100%);
+    border-radius: 999px;
+    display: block;
+    height: 4px;
+    margin: 24px 0 22px;
+    width: 42px;
+  }
+
+  &__description {
+    color: #64748d;
+    font-size: 14px;
+    line-height: 1.8;
+    margin: 0;
+  }
+
+  &__login-area {
+    align-items: center;
+    backdrop-filter: blur(8px);
+    background: rgba(235, 244, 255, 0.42);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 0;
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: clamp(24px, 6vh, 60px) 76px clamp(24px, 5vh, 40px) 64px;
+    position: relative;
+  }
+
+  &__panel {
+    backdrop-filter: blur(30px);
+    background: rgba(255, 255, 255, 0.46);
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    border-radius: 18px;
+    box-shadow:
+      0 26px 80px rgba(76, 102, 133, 0.18),
+      inset 0 1px 0 rgba(255, 255, 255, 0.78);
+    box-sizing: border-box;
+    min-height: clamp(530px, calc(100dvh - 168px), 600px);
+    padding: clamp(42px, 7vh, 58px) 64px clamp(36px, 5.5vh, 46px);
+    width: 440px;
+  }
+
+  &__panel-icon {
+    border-radius: 999px;
+    box-shadow:
+      0 18px 38px rgba(74, 107, 180, 0.16),
+      inset 0 1px 0 rgba(255, 255, 255, 0.86);
+    display: flex;
+    height: clamp(72px, 10vh, 84px);
+    margin: 0 auto clamp(22px, 3.4vh, 28px);
+    outline: 1px solid rgba(255, 255, 255, 0.72);
+    outline-offset: 0;
+    position: relative;
+    width: clamp(72px, 10vh, 84px);
+
+    &::before {
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.58) 0%, rgba(245, 250, 255, 0.22) 100%);
+      border-radius: inherit;
+      content: "";
+      inset: 0;
+      position: absolute;
+    }
+
+    svg {
+      background: linear-gradient(135deg, #6da4ff 0%, #4768f4 100%);
+      border-radius: 8px;
+      box-shadow: 0 10px 20px rgba(67, 104, 232, 0.22);
+      height: 38px;
+      padding: 8px;
+      position: relative;
+      width: 38px;
+    }
+  }
+
+  &__panel-head {
+    margin-bottom: clamp(24px, 4vh, 34px);
+    text-align: center;
+  }
+
+  &__panel-title {
+    color: #163761;
+    font-family: "STKaiti", "KaiTi", "Microsoft YaHei", sans-serif;
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    line-height: 1.18;
+    margin: 0 0 15px;
+  }
+
+  &__panel-subtitle {
+    color: #65748d;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  &__wave {
+    background:
+      linear-gradient(135deg, transparent 32%, #6e95ff 34%, #6e95ff 46%, transparent 48%) 0 0 / 16px 8px repeat-x;
+    display: block;
+    height: 8px;
+    margin: 14px auto 0;
+    width: 44px;
   }
 
   &__form {
     display: grid;
-    gap: $space-4;
+    gap: 18px;
   }
 
-  &__demo-tip {
-    background: #f8fbff;
-    border: 1px solid $color-border-soft;
-    border-radius: $radius-md;
-    color: $color-text-muted;
+  &__field {
+    display: grid;
+  }
+
+  &__field-label {
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+
+  &__field-shell {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid rgba(226, 235, 248, 0.82);
+    border-radius: 9px;
+    box-shadow: 0 10px 24px rgba(124, 150, 183, 0.08);
+    display: grid;
+    gap: 12px;
+    grid-template-columns: 18px minmax(0, 1fr) auto;
+    min-height: 44px;
+    padding: 0 14px;
+    transition:
+      background 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease;
+
+    &:focus-within {
+      background: rgba(255, 255, 255, 0.98);
+      border-color: rgba(87, 126, 255, 0.55);
+      box-shadow:
+        0 10px 24px rgba(87, 126, 255, 0.12),
+        0 0 0 3px rgba(87, 126, 255, 0.1);
+    }
+  }
+
+  &__field-icon {
+    color: #8093b4;
+    height: 16px;
+    width: 16px;
+  }
+
+  &__field-icon--trail {
+    height: 15px;
+    width: 15px;
+  }
+
+  &__input {
+    background: transparent;
+    border: 0;
+    color: #203c62;
+    font-size: 13px;
+    min-width: 0;
+    outline: none;
+    width: 100%;
+
+    &::placeholder {
+      color: #96a4bb;
+    }
+  }
+
+  &__error {
+    background: rgba(255, 95, 115, 0.08);
+    border: 1px solid rgba(255, 95, 115, 0.16);
+    border-radius: 8px;
+    color: $color-danger;
     font-size: 13px;
     line-height: 1.5;
-    margin: -$space-2 0 0;
-    padding: $space-3;
+    margin: -4px 0 0;
+    padding: 9px 12px;
+  }
 
-    strong {
-      color: $color-primary;
-      font-weight: 800;
+  &__copyright {
+    color: #72839b;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: clamp(20px, 4vh, 34px) 0 0;
+    text-align: center;
+  }
+
+  :deep(.archive-button) {
+    background: linear-gradient(135deg, #63b8ff 0%, #5f8dff 50%, #3459db 100%);
+    border: 0;
+    border-radius: 8px;
+    box-shadow: 0 15px 26px rgba(55, 98, 222, 0.28);
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 6px;
+    min-height: 49px;
+    padding-left: 22px;
+    width: 100%;
+
+    &:not(:disabled):hover {
+      background: linear-gradient(135deg, #58afff 0%, #547fff 50%, #2f50cf 100%);
+    }
+  }
+}
+
+@media (min-width: 881px) {
+  :global(html:has(.entry-gate)) {
+    overflow-y: hidden;
+    scrollbar-gutter: auto;
+  }
+}
+
+@media (max-width: 1080px) {
+  .entry-gate {
+    &__login-area {
+      padding-left: 42px;
+      padding-right: 42px;
+    }
+
+    &__panel {
+      width: min(100%, 420px);
+    }
+  }
+}
+
+@media (max-width: 880px) {
+  .entry-gate {
+    height: auto;
+    min-height: 100dvh;
+    overflow: auto;
+
+    &__layout {
+      grid-template-columns: 1fr;
+      height: auto;
+      min-height: 100dvh;
+    }
+
+    &__hero {
+      min-height: 335px;
+      padding: 34px 28px 0;
+    }
+
+    &__hero-copy {
+      margin: 58px 0 0;
+      max-width: 410px;
+    }
+
+    &__login-area {
+      backdrop-filter: blur(10px);
+      background: rgba(238, 246, 255, 0.68);
+      padding: 28px 22px 40px;
+    }
+  }
+}
+
+@media (max-width: 620px) {
+  .entry-gate {
+    &::before {
+      background-position: 40% center;
+    }
+
+    &__hero {
+      min-height: 300px;
+    }
+
+    &__brand-name {
+      font-size: 16px;
+    }
+
+    &__title {
+      font-size: 28px;
+    }
+
+    &__panel {
+      border-radius: 16px;
+      min-height: auto;
+      padding: 44px 22px 34px;
+      width: 100%;
+    }
+
+    &__panel-icon {
+      height: 72px;
+      margin-bottom: 24px;
+      width: 72px;
+
+      svg {
+        height: 34px;
+        width: 34px;
+      }
+    }
+
+    &__copyright {
+      font-size: 12px;
     }
   }
 }

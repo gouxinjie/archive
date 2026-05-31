@@ -7,6 +7,7 @@ import Database from 'better-sqlite3';
 import type { Database as DatabaseConnection } from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { normalizeDocumentCategory, normalizeStudyCategory } from '../../src/constants/archiveCategories';
 import { getLegacyPasswordCategoryEntries, normalizePasswordCategory } from '../../src/constants/passwordCategories';
 
 let databaseConnection: DatabaseConnection | null = null;
@@ -17,6 +18,12 @@ interface CountRow {
 
 interface TableColumnRow {
   name: string;
+}
+
+interface FileAssetCategoryMigrationRow {
+  id: string;
+  module: string;
+  category: string | null;
 }
 
 export interface ArchiveProfileRow {
@@ -192,10 +199,34 @@ const initializeDatabase = (database: DatabaseConnection): void => {
 
   migratePasswordItemColumns(database);
   migrateLegacyPasswordCategories(database);
+  migrateFileAssetCategories(database);
   migrateArchiveProfilesToUsers(database);
   ensureDefaultUsers(database);
   ensureDefaultProfiles(database);
   migrateOwnerDataToProfiles(database);
+};
+
+/**
+ * 迁移历史文件资产分类
+ * @param database - SQLite 数据库连接
+ * @returns 无返回值
+ * @throws 当迁移失败时抛出异常
+ */
+const migrateFileAssetCategories = (database: DatabaseConnection): void => {
+  const rows = database
+    .prepare("SELECT id, module, category FROM file_assets WHERE module IN ('documents', 'study')")
+    .all() as FileAssetCategoryMigrationRow[];
+  const updateCategory = database.prepare('UPDATE file_assets SET category = ? WHERE id = ?');
+
+  for (const row of rows) {
+    const normalizedCategory = row.module === 'documents'
+      ? normalizeDocumentCategory(row.category)
+      : normalizeStudyCategory(row.category);
+
+    if (normalizedCategory !== row.category) {
+      updateCategory.run(normalizedCategory, row.id);
+    }
+  }
 };
 
 /**

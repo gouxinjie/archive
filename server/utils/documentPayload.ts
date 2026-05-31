@@ -2,6 +2,8 @@
  * 文档请求参数解析工具
  */
 
+import { normalizeDocumentCategory, type DocumentCategory } from '../../src/constants/archiveCategories';
+
 export type DocumentFileType = 'md' | 'txt';
 
 export interface DocumentRequestBody {
@@ -15,7 +17,7 @@ export interface DocumentRequestBody {
 
 export interface DocumentPayload {
   title: string;
-  category: string | null;
+  category: DocumentCategory;
   fileType: DocumentFileType;
   originalName: string;
   content: string;
@@ -113,7 +115,7 @@ export const parseDocumentPayload = (body: DocumentRequestBody): DocumentPayload
 
   return {
     title,
-    category: normalizeOptionalText(body.category),
+    category: normalizeDocumentCategory(normalizeOptionalText(body.category)),
     fileType,
     originalName: normalizeOriginalName(body.originalName, title, fileType),
     content,

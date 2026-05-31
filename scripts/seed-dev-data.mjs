@@ -142,7 +142,7 @@ const fileAssets = [
   {
     id: 'seed-doc-nuxt-plan',
     module: 'documents',
-    category: '项目文档',
+    category: '项目说明',
     title: 'Nuxt 4 部署笔记',
     originalName: 'nuxt-deploy.md',
     storagePath: 'demo/documents/nuxt-deploy.md',
@@ -153,7 +153,7 @@ const fileAssets = [
   {
     id: 'seed-doc-sqlite-note',
     module: 'documents',
-    category: '数据库',
+    category: '项目说明',
     title: 'SQLite 使用说明',
     originalName: 'sqlite-note.md',
     storagePath: 'demo/documents/sqlite-note.md',

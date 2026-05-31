@@ -20,7 +20,7 @@ export const ARCHIVE_MODULES: readonly ArchiveModuleConfig[] = [
   {
     key: 'documents',
     name: '我的文档',
-    description: 'Markdown、PDF、DOCX 和常用资料',
+    description: '工作记录、项目说明、备忘和模板',
     tone: 'cyan'
   },
   {
@@ -44,7 +44,7 @@ export const ARCHIVE_MODULES: readonly ArchiveModuleConfig[] = [
   {
     key: 'study',
     name: '学习资料',
-    description: '课程文档、截图、图片和学习文件',
+    description: '前端、后端、数据库和 AI 相关学习资料',
     tone: 'violet'
   }
 ] as const;

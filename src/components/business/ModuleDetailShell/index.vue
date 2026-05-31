@@ -41,6 +41,12 @@ import AppButton from '~/components/commons/AppButton/index.vue';
 import AppInput from '~/components/commons/AppInput/index.vue';
 import FileDropzone from '~/components/commons/FileDropzone/index.vue';
 import { APP_ENGLISH_NAME, APP_NAME, ARCHIVE_MODULES } from '~/constants/app';
+import {
+  DOCUMENT_CATEGORY_OPTIONS,
+  STUDY_CATEGORY_OPTIONS,
+  normalizeDocumentCategory,
+  normalizeStudyCategory
+} from '~/constants/archiveCategories';
 import { PASSWORD_CATEGORY_OPTIONS } from '~/constants/passwordCategories';
 import type { DashboardSummaryData, ResumePreviewData } from '~/types/api';
 import type {
@@ -269,13 +275,12 @@ const documentContentLoading = ref(false);
 const documentFormRef = ref<FormInstance>();
 const documentForm = ref<DocumentFormPayload>({
   title: '',
-  category: '',
+  category: '备忘',
   fileType: 'md',
   originalName: '',
   content: '',
   remark: ''
 });
-const documentCategoryOptions = ['项目文档', '技术笔记', '生活记录', '合同资料', '其他'];
 const documentFileTypeOptions: Array<{ label: string; value: DocumentFileType }> = [
   { label: 'Markdown', value: 'md' },
   { label: 'TXT', value: 'txt' }
@@ -284,6 +289,7 @@ const documentUploadAccept = '.md,.markdown,.txt,text/markdown,text/plain';
 const maxDocumentUploadBytes = 1024 * 1024;
 const documentFormRules: FormRules<DocumentFormPayload> = {
   title: [{ required: true, message: '请输入文档标题', trigger: 'blur' }],
+  category: [{ required: true, message: '请选择文档分类', trigger: 'change' }],
   fileType: [{ required: true, message: '请选择文档类型', trigger: 'change' }]
 };
 const resumeDialogVisible = ref(false);
@@ -342,6 +348,7 @@ const isDocumentModule = computed<boolean>(() => props.module.key === 'documents
 const isResumeModule = computed<boolean>(() => props.module.key === 'resumes');
 const isImageModule = computed<boolean>(() => props.module.key === 'images');
 const isCertificateModule = computed<boolean>(() => props.module.key === 'certificates');
+const isStudyModule = computed<boolean>(() => props.module.key === 'study');
 const isPasswordDialogReadonly = computed<boolean>(() => passwordDialogMode.value === 'view');
 const isDocumentDialogReadonly = computed<boolean>(() => documentDialogMode.value === 'view');
 const passwordDialogTitle = computed<string>(() => {
@@ -479,9 +486,9 @@ const createCategoryGroups = <T>(items: T[], getCategory: (item: T) => string | 
 const normalizeCategoryByRules = (
   category: string | null | undefined,
   options: readonly string[],
-  rules: readonly CategoryAliasRule[]
+  rules: readonly CategoryAliasRule[],
+  fallbackCategory = options.includes('其他') ? '其他' : '未分类'
 ): string => {
-  const fallbackCategory = options.includes('其他') ? '其他' : '未分类';
   const trimmedCategory = category?.trim();
 
   if (!trimmedCategory) {
@@ -553,7 +560,10 @@ const passwordGroups = computed<CategoryGroup<PasswordListItem>[]>(() => {
 });
 
 const documentGroups = computed<CategoryGroup<DocumentListItem>[]>(() => {
-  return createCategoryGroups(documentItems.value, (item) => item.category);
+  return sortGroupsByCategoryOptions(
+    createCategoryGroups(documentItems.value, (item) => normalizeDocumentCategory(item.category)),
+    DOCUMENT_CATEGORY_OPTIONS
+  );
 });
 
 const resumeGroups = computed<CategoryGroup<FileAssetListItem>[]>(() => {
@@ -572,6 +582,13 @@ const fileGroups = computed<CategoryGroup<FileAssetListItem>[]>(() => {
     return sortGroupsByCategoryOptions(
       createCategoryGroups(fileItems.value, (item) => normalizeCertificateCategory(item.category)),
       certificateModuleCategoryOptions
+    );
+  }
+
+  if (isStudyModule.value) {
+    return sortGroupsByCategoryOptions(
+      createCategoryGroups(fileItems.value, (item) => normalizeStudyCategory(item.category)),
+      STUDY_CATEGORY_OPTIONS
     );
   }
 
@@ -599,7 +616,7 @@ const categoryTabs = computed<string[]>(() => {
     }
 
     if (isDocumentModule.value) {
-      return documentGroups.value.map((group) => group.name);
+      return [...DOCUMENT_CATEGORY_OPTIONS];
     }
 
     if (isResumeModule.value) {
@@ -612,6 +629,10 @@ const categoryTabs = computed<string[]>(() => {
 
     if (isCertificateModule.value) {
       return [...certificateModuleCategoryOptions];
+    }
+
+    if (isStudyModule.value) {
+      return [...STUDY_CATEGORY_OPTIONS];
     }
 
     return fileGroups.value.map((group) => group.name);
@@ -1099,7 +1120,7 @@ const openCreateDocumentDialog = (): void => {
   documentSubmitAttempted.value = false;
   documentForm.value = {
     title: '',
-    category: '',
+    category: '备忘',
     fileType: 'md',
     originalName: '',
     content: '',
@@ -1112,7 +1133,7 @@ const fillDocumentForm = (item: DocumentListItem, content = ''): void => {
   documentForm.value = {
     id: item.id,
     title: item.title,
-    category: item.category || '',
+    category: normalizeDocumentCategory(item.category),
     fileType: item.fileType,
     originalName: item.originalName,
     content,
@@ -2464,14 +2485,11 @@ watch(
           <el-select
             v-else
             v-model="documentForm.category"
-            placeholder="选择或输入分类"
+            placeholder="选择分类"
             filterable
-            allow-create
-            default-first-option
-            clearable
           >
             <el-option
-              v-for="category in documentCategoryOptions"
+              v-for="category in DOCUMENT_CATEGORY_OPTIONS"
               :key="category"
               :label="category"
               :value="category"

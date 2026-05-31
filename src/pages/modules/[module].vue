@@ -13,13 +13,14 @@ import EntryGate from '~/components/business/EntryGate/index.vue';
 import ModuleDetailShell from '~/components/business/ModuleDetailShell/index.vue';
 import { useArchiveSession } from '~/composables/useArchiveSession';
 import { ARCHIVE_MODULES } from '~/constants/app';
-import type { DashboardSummaryData } from '~/types/api';
+import type { ApiResponse, DashboardSummaryData } from '~/types/api';
 import type {
   ArchiveModuleConfig,
   ArchiveModuleKey,
   DocumentFormPayload,
   DocumentListItem,
   FileAssetListItem,
+  ImageFormPayload,
   ModuleDetailData,
   PasswordFormPayload,
   PasswordListItem,
@@ -63,6 +64,10 @@ const resumeOperationLoading = ref(false);
 const resumeOperationError = ref('');
 const resumeSuccessVersion = ref(0);
 const resumeDeleteSuccessVersion = ref(0);
+const imageOperationLoading = ref(false);
+const imageOperationError = ref('');
+const imageSuccessVersion = ref(0);
+const imageDeleteSuccessVersion = ref(0);
 let moduleRequestSerial = 0;
 const activeModuleLoadSignature = useState<string>('archive-module-active-load-signature', () => '');
 
@@ -392,14 +397,34 @@ const handleSaveResume = async (payload: ResumeFormPayload): Promise<void> => {
   resumeOperationError.value = '';
   moduleError.value = '';
 
-  const formData = new FormData();
-  formData.append('title', payload.title);
-  formData.append('category', payload.category);
-  formData.append('remark', payload.remark);
-  formData.append('file', payload.file, payload.file.name);
-
   try {
-    const response = await uploadRequest<{ id: string }>('/api/resumes', formData);
+    let response: ApiResponse<{ id: string }>;
+
+    if (payload.id) {
+      const formData = new FormData();
+      formData.append('title', payload.title);
+      formData.append('category', payload.category);
+      formData.append('remark', payload.remark);
+
+      if (payload.file) {
+        formData.append('file', payload.file, payload.file.name);
+      }
+
+      response = await uploadRequest<{ id: string }>(`/api/resumes/${payload.id}`, formData, {
+        method: 'PUT'
+      });
+    } else {
+      if (!payload.file) {
+        throw new Error('请先选择 docx 或 pdf 简历文件');
+      }
+
+      const formData = new FormData();
+      formData.append('title', payload.title);
+      formData.append('category', payload.category);
+      formData.append('remark', payload.remark);
+      formData.append('file', payload.file, payload.file.name);
+      response = await uploadRequest<{ id: string }>('/api/resumes', formData);
+    }
 
     if (!response.success) {
       resumeOperationError.value = response.message;
@@ -407,10 +432,10 @@ const handleSaveResume = async (payload: ResumeFormPayload): Promise<void> => {
     }
 
     resumeSuccessVersion.value += 1;
-    ElMessage.success('简历上传成功');
+    ElMessage.success(payload.id ? '简历信息保存成功' : '简历上传成功');
     await loadPageData(currentKeyword.value, true);
   } catch (error: unknown) {
-    resumeOperationError.value = error instanceof Error ? error.message : '简历上传失败';
+    resumeOperationError.value = error instanceof Error ? error.message : '简历保存失败';
     console.error(resumeOperationError.value);
   } finally {
     resumeOperationLoading.value = false;
@@ -443,6 +468,82 @@ const handleDeleteResume = async (id: string): Promise<void> => {
   }
 };
 
+const handleSaveImage = async (payload: ImageFormPayload): Promise<void> => {
+  imageOperationLoading.value = true;
+  imageOperationError.value = '';
+  moduleError.value = '';
+
+  try {
+    let response: ApiResponse<{ id: string }>;
+
+    if (payload.id) {
+      const formData = new FormData();
+      formData.append('title', payload.title);
+      formData.append('category', payload.category);
+      formData.append('remark', payload.remark);
+
+      if (payload.file) {
+        formData.append('file', payload.file, payload.file.name);
+      }
+
+      response = await uploadRequest<{ id: string }>(`/api/images/${payload.id}`, formData, {
+        method: 'PUT'
+      });
+    } else {
+      if (!payload.file) {
+        throw new Error('请先选择需要上传的图片');
+      }
+
+      const formData = new FormData();
+      formData.append('title', payload.title);
+      formData.append('category', payload.category);
+      formData.append('remark', payload.remark);
+      formData.append('file', payload.file, payload.file.name);
+      response = await uploadRequest<{ id: string }>('/api/images', formData);
+    }
+
+    if (!response.success) {
+      imageOperationError.value = response.message;
+      return;
+    }
+
+    imageSuccessVersion.value += 1;
+    ElMessage.success(payload.id ? '图片信息保存成功' : '图片上传成功');
+    await loadPageData(currentKeyword.value, true);
+  } catch (error: unknown) {
+    imageOperationError.value = error instanceof Error ? error.message : '图片保存失败';
+    console.error(imageOperationError.value);
+  } finally {
+    imageOperationLoading.value = false;
+  }
+};
+
+const handleDeleteImage = async (id: string): Promise<void> => {
+  imageOperationLoading.value = true;
+  imageOperationError.value = '';
+  moduleError.value = '';
+
+  try {
+    const response = await request<{ id: string }>(`/api/images/${id}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.success) {
+      moduleError.value = response.message;
+      return;
+    }
+
+    imageDeleteSuccessVersion.value += 1;
+    ElMessage.success('图片删除成功');
+    await loadPageData(currentKeyword.value, true);
+  } catch (error: unknown) {
+    moduleError.value = error instanceof Error ? error.message : '图片删除失败';
+    console.error(moduleError.value);
+  } finally {
+    imageOperationLoading.value = false;
+  }
+};
+
 onMounted(async () => {
   if (!session.initialized.value) {
     await session.loadStatus();
@@ -464,6 +565,7 @@ watch(
     passwordOperationError.value = '';
     documentOperationError.value = '';
     resumeOperationError.value = '';
+    imageOperationError.value = '';
     await loadPageData('');
   },
   { immediate: true }
@@ -499,6 +601,10 @@ watch(
     :resume-operation-error="resumeOperationError"
     :resume-success-version="resumeSuccessVersion"
     :resume-delete-success-version="resumeDeleteSuccessVersion"
+    :image-operation-loading="imageOperationLoading"
+    :image-operation-error="imageOperationError"
+    :image-success-version="imageSuccessVersion"
+    :image-delete-success-version="imageDeleteSuccessVersion"
     @lock="handleLock"
     @back-home="handleBackHome"
     @open-module="handleOpenModule"
@@ -509,5 +615,7 @@ watch(
     @delete-document="handleDeleteDocument"
     @save-resume="handleSaveResume"
     @delete-resume="handleDeleteResume"
+    @save-image="handleSaveImage"
+    @delete-image="handleDeleteImage"
   />
 </template>

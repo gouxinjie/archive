@@ -79,15 +79,15 @@ const initializeDatabase = (database) => {
 /**
  * 写入开发示例文件，确保文件路径可以真实存在
  * @param {string} storagePath - 相对上传目录的文件路径
- * @param {string} content - 文件内容
+ * @param {string | Buffer} content - 文件内容
  * @returns {number} 文件字节大小
  * @throws 当目录或文件写入失败时抛出错误
  */
 const writeSampleFile = (storagePath, content) => {
   const absolutePath = resolve(uploadsDir, storagePath);
   mkdirSync(dirname(absolutePath), { recursive: true });
-  writeFileSync(absolutePath, content, 'utf8');
-  return Buffer.byteLength(content, 'utf8');
+  writeFileSync(absolutePath, content);
+  return Buffer.isBuffer(content) ? content.byteLength : Buffer.byteLength(content, 'utf8');
 };
 
 /**
@@ -132,6 +132,11 @@ const passwordItems = [
   ['seed-password-cmb', '招商银行 App', '银行金融', 'https://www.cmbchina.com', '手机号', '13800000005', 'Bank@demo2026', '13800000005', '', '工资卡与常用银行卡账号'],
   ['seed-password-steam', 'Steam', '游戏娱乐', 'https://store.steampowered.com', '邮箱', 'game@example.com', 'Steam@demo2026', '', 'game@example.com', '游戏库和社区账号']
 ];
+
+const samplePngContent = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
+  'base64'
+);
 
 const fileAssets = [
   {
@@ -183,22 +188,22 @@ const fileAssets = [
     module: 'images',
     category: '证件照',
     title: '蓝底证件照',
-    originalName: 'id-photo.txt',
-    storagePath: 'demo/images/id-photo.txt',
-    mimeType: 'text/plain',
-    remark: '占位文件，真实项目中替换为图片',
-    content: '这是证件照占位文件，后续上传真实图片。\n'
+    originalName: 'id-photo.png',
+    storagePath: 'demo/images/id-photo.png',
+    mimeType: 'image/png',
+    remark: '开发演示图片，可替换为真实证件照',
+    content: samplePngContent
   },
   {
     id: 'seed-image-life',
     module: 'images',
     category: '生活照',
     title: '生活照精选',
-    originalName: 'life-photo.txt',
-    storagePath: 'demo/images/life-photo.txt',
-    mimeType: 'text/plain',
-    remark: '占位文件，真实项目中替换为图片',
-    content: '这是生活照占位文件，后续上传真实图片。\n'
+    originalName: 'life-photo.png',
+    storagePath: 'demo/images/life-photo.png',
+    mimeType: 'image/png',
+    remark: '开发演示图片，可替换为真实生活照',
+    content: samplePngContent
   },
   {
     id: 'seed-certificate-id-card',

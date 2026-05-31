@@ -127,13 +127,28 @@ export interface DocumentFormPayload {
 }
 
 export interface ResumeFormPayload {
+  /** 类型：字符串或 undefined；含义：简历记录唯一标识；是否必填：编辑时必填；默认值：undefined */
+  id?: string;
   /** 类型：字符串；含义：简历标题；是否必填：是；默认值：空字符串 */
   title: string;
   /** 类型：字符串；含义：简历分类；是否必填：否；默认值：通用 */
   category: string;
-  /** 类型：File；含义：上传的简历文件；是否必填：是；默认值：无 */
-  file: File;
+  /** 类型：File 或 undefined；含义：上传的简历文件；是否必填：新增时必填；默认值：undefined */
+  file?: File;
   /** 类型：字符串；含义：备注；是否必填：否；默认值：空字符串 */
+  remark: string;
+}
+
+export interface ImageFormPayload {
+  /** 类型：字符串或 undefined；含义：图片记录唯一标识；是否必填：编辑时必填；默认值：undefined */
+  id?: string;
+  /** 类型：字符串；含义：图片标题；是否必填：是；默认值：空字符串 */
+  title: string;
+  /** 类型：字符串；含义：图片分类；是否必填：否；默认值：证件照 */
+  category: string;
+  /** 类型：File 或 undefined；含义：上传或替换的图片文件；是否必填：新增时必填；默认值：undefined */
+  file?: File;
+  /** 类型：字符串；含义：图片备注；是否必填：否；默认值：空字符串 */
   remark: string;
 }
 

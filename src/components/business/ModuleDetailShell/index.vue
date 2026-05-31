@@ -13,8 +13,10 @@ import {
   ArrowRight,
   Close,
   Delete,
+  Download,
   EditPen,
-  Plus
+  Plus,
+  View
 } from '@element-plus/icons-vue';
 import {
   ElAlert,
@@ -46,12 +48,13 @@ import type {
   DocumentFormPayload,
   DocumentListItem,
   FileAssetListItem,
+  ImageFormPayload,
   PasswordFormPayload,
   PasswordListItem,
   ResumeFileType,
   ResumeFormPayload
 } from '~/types/models';
-import { request } from '~/utils/request';
+import { getArchiveUserId, request } from '~/utils/request';
 
 interface ModuleDetailShellProps {
   /** 类型：ArchiveModuleConfig；含义：当前模块配置；是否必填：是；默认值：无 */
@@ -88,6 +91,14 @@ interface ModuleDetailShellProps {
   resumeSuccessVersion?: number;
   /** 类型：数字；含义：简历删除成功信号；是否必填：否；默认值：0 */
   resumeDeleteSuccessVersion?: number;
+  /** 类型：布尔值；含义：图片上传、编辑或删除操作是否执行中；是否必填：否；默认值：false */
+  imageOperationLoading?: boolean;
+  /** 类型：字符串；含义：图片弹窗内操作错误提示；是否必填：否；默认值：空字符串 */
+  imageOperationError?: string;
+  /** 类型：数字；含义：图片保存成功信号；是否必填：否；默认值：0 */
+  imageSuccessVersion?: number;
+  /** 类型：数字；含义：图片删除成功信号；是否必填：否；默认值：0 */
+  imageDeleteSuccessVersion?: number;
 }
 
 interface CategoryGroup<T> {
@@ -107,11 +118,26 @@ interface LoginMethodOptionGroup {
 type DocumentEditorMode = 'write' | 'preview';
 
 interface ResumeFormState {
+  /** 类型：字符串或 undefined；含义：简历记录唯一标识；是否必填：编辑时必填；默认值：undefined */
+  id?: string;
   /** 类型：字符串；含义：简历标题；是否必填：是；默认值：空字符串 */
   title: string;
   /** 类型：字符串；含义：简历分类；是否必填：否；默认值：通用 */
   category: string;
   /** 类型：字符串；含义：上传文件原始名称；是否必填：否；默认值：空字符串 */
+  originalName: string;
+  /** 类型：字符串；含义：备注；是否必填：否；默认值：空字符串 */
+  remark: string;
+}
+
+interface ImageFormState {
+  /** 类型：字符串或 undefined；含义：图片记录唯一标识；是否必填：编辑时必填；默认值：undefined */
+  id?: string;
+  /** 类型：字符串；含义：图片标题；是否必填：是；默认值：空字符串 */
+  title: string;
+  /** 类型：字符串；含义：图片分类；是否必填：是；默认值：其他 */
+  category: string;
+  /** 类型：字符串；含义：当前图片原始文件名；是否必填：否；默认值：空字符串 */
   originalName: string;
   /** 类型：字符串；含义：备注；是否必填：否；默认值：空字符串 */
   remark: string;
@@ -130,7 +156,11 @@ const props = withDefaults(defineProps<ModuleDetailShellProps>(), {
   resumeOperationLoading: false,
   resumeOperationError: '',
   resumeSuccessVersion: 0,
-  resumeDeleteSuccessVersion: 0
+  resumeDeleteSuccessVersion: 0,
+  imageOperationLoading: false,
+  imageOperationError: '',
+  imageSuccessVersion: 0,
+  imageDeleteSuccessVersion: 0
 });
 
 const emit = defineEmits<{
@@ -144,6 +174,8 @@ const emit = defineEmits<{
   deleteDocument: [id: string];
   saveResume: [payload: ResumeFormPayload];
   deleteResume: [id: string];
+  saveImage: [payload: ImageFormPayload];
+  deleteImage: [id: string];
 }>();
 
 const keyword = ref('');
@@ -218,6 +250,7 @@ const documentFormRules: FormRules<DocumentFormPayload> = {
   fileType: [{ required: true, message: '请选择文档类型', trigger: 'change' }]
 };
 const resumeDialogVisible = ref(false);
+const resumeDialogMode = ref<'create' | 'edit'>('create');
 const resumeFormError = ref('');
 const resumeSubmitAttempted = ref(false);
 const resumeFormRef = ref<FormInstance>();
@@ -236,6 +269,27 @@ const resumeFormRules: FormRules<ResumeFormState> = {
   title: [{ required: true, message: '请输入简历标题', trigger: 'blur' }],
   category: [{ required: true, message: '请选择或输入分类', trigger: 'change' }]
 };
+const imageDialogVisible = ref(false);
+const imagePreviewDialogVisible = ref(false);
+const imageDialogMode = ref<'create' | 'edit'>('create');
+const imageFormError = ref('');
+const imageSubmitAttempted = ref(false);
+const imageFormRef = ref<FormInstance>();
+const selectedImageFile = ref<File | null>(null);
+const previewImageItem = ref<FileAssetListItem | null>(null);
+const imageForm = ref<ImageFormState>({
+  title: '',
+  category: '证件照',
+  originalName: '',
+  remark: ''
+});
+const imageCategoryOptions = ['证件照', '自拍照', '生活照', '工作照', '截图', '其他'];
+const imageUploadAccept = '.jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif';
+const maxImageUploadBytes = 15 * 1024 * 1024;
+const imageFormRules: FormRules<ImageFormState> = {
+  title: [{ required: true, message: '请输入图片标题', trigger: 'blur' }],
+  category: [{ required: true, message: '请选择或输入分类', trigger: 'change' }]
+};
 
 const moduleCounts = computed<Record<ArchiveModuleKey, number>>(() => ({
   passwords: props.summary.passwordCount,
@@ -249,6 +303,7 @@ const moduleCounts = computed<Record<ArchiveModuleKey, number>>(() => ({
 const isPasswordModule = computed<boolean>(() => props.module.key === 'passwords');
 const isDocumentModule = computed<boolean>(() => props.module.key === 'documents');
 const isResumeModule = computed<boolean>(() => props.module.key === 'resumes');
+const isImageModule = computed<boolean>(() => props.module.key === 'images');
 const isPasswordDialogReadonly = computed<boolean>(() => passwordDialogMode.value === 'view');
 const isDocumentDialogReadonly = computed<boolean>(() => documentDialogMode.value === 'view');
 const passwordDialogTitle = computed<string>(() => {
@@ -294,6 +349,19 @@ const resumeDialogErrorMessage = computed<string>(() => {
 
   return resumeSubmitAttempted.value ? props.resumeOperationError : '';
 });
+const resumeDialogTitle = computed<string>(() => {
+  return resumeDialogMode.value === 'create' ? '上传简历' : '编辑简历';
+});
+const imageDialogTitle = computed<string>(() => {
+  return imageDialogMode.value === 'create' ? '上传图片' : '编辑图片';
+});
+const imageDialogErrorMessage = computed<string>(() => {
+  if (imageFormError.value) {
+    return imageFormError.value;
+  }
+
+  return imageSubmitAttempted.value ? props.imageOperationError : '';
+});
 
 const passwordItems = computed<PasswordListItem[]>(() => {
   if (!isPasswordModule.value) {
@@ -312,7 +380,7 @@ const documentItems = computed<DocumentListItem[]>(() => {
 });
 
 const fileItems = computed<FileAssetListItem[]>(() => {
-  if (isPasswordModule.value || isDocumentModule.value || isResumeModule.value) {
+  if (isPasswordModule.value || isDocumentModule.value || isResumeModule.value || isImageModule.value) {
     return [];
   }
 
@@ -321,6 +389,14 @@ const fileItems = computed<FileAssetListItem[]>(() => {
 
 const resumeItems = computed<FileAssetListItem[]>(() => {
   if (!isResumeModule.value) {
+    return [];
+  }
+
+  return props.items as FileAssetListItem[];
+});
+
+const imageItems = computed<FileAssetListItem[]>(() => {
+  if (!isImageModule.value) {
     return [];
   }
 
@@ -360,6 +436,10 @@ const documentGroups = computed<CategoryGroup<DocumentListItem>[]>(() => {
 
 const resumeGroups = computed<CategoryGroup<FileAssetListItem>[]>(() => {
   return createCategoryGroups(resumeItems.value, (item) => item.category);
+});
+
+const imageGroups = computed<CategoryGroup<FileAssetListItem>[]>(() => {
+  return createCategoryGroups(imageItems.value, (item) => item.category);
 });
 
 const fileGroups = computed<CategoryGroup<FileAssetListItem>[]>(() => {
@@ -532,6 +612,57 @@ const getResumeExtensionText = (item: FileAssetListItem): string => {
 const getResumeSummaryText = (item: FileAssetListItem): string => {
   const values = [item.originalName, item.remark, item.updatedAt].filter((value): value is string => Boolean(value));
   return values.join(' · ');
+};
+
+/**
+ * 获取图片文件扩展名
+ * @param item - 图片文件记录
+ * @returns 大写扩展名
+ * @throws 不抛出异常
+ */
+const getImageExtensionText = (item: FileAssetListItem): string => {
+  const extension = item.originalName.split('.').pop()?.trim();
+  return extension ? extension.toUpperCase() : 'IMG';
+};
+
+/**
+ * 获取图片列表的辅助说明
+ * @param item - 图片文件记录
+ * @returns 文件名、备注和更新时间组成的说明文本
+ * @throws 不抛出异常
+ */
+const getImageSummaryText = (item: FileAssetListItem): string => {
+  const values = [item.originalName, item.remark, item.updatedAt].filter((value): value is string => Boolean(value));
+  return values.join(' · ');
+};
+
+/**
+ * 判断文件是否为可预览图片
+ * @param item - 文件记录
+ * @returns 是否为图片 MIME 类型
+ * @throws 不抛出异常
+ */
+const isImagePreviewable = (item: FileAssetListItem): boolean => {
+  return item.mimeType.startsWith('image/');
+};
+
+/**
+ * 生成图片读取地址
+ * @param item - 图片文件记录
+ * @param download - 是否下载
+ * @returns 带 userId 的图片接口地址
+ * @throws 不抛出异常
+ */
+const buildImageFileUrl = (item: FileAssetListItem, download = false): string => {
+  const query = new URLSearchParams({
+    userId: getArchiveUserId()
+  });
+
+  if (download) {
+    query.set('download', '1');
+  }
+
+  return `/api/images/${encodeURIComponent(item.id)}?${query.toString()}`;
 };
 
 const handleSearch = (): void => {
@@ -970,6 +1101,7 @@ const handleResumeFilesSelected = (files: File[]): void => {
 };
 
 const openCreateResumeDialog = (): void => {
+  resumeDialogMode.value = 'create';
   resumeFormError.value = '';
   resumeSubmitAttempted.value = false;
   selectedResumeFile.value = null;
@@ -978,6 +1110,21 @@ const openCreateResumeDialog = (): void => {
     category: '通用',
     originalName: '',
     remark: ''
+  };
+  resumeDialogVisible.value = true;
+};
+
+const openEditResumeDialog = (item: FileAssetListItem): void => {
+  resumeDialogMode.value = 'edit';
+  resumeFormError.value = '';
+  resumeSubmitAttempted.value = false;
+  selectedResumeFile.value = null;
+  resumeForm.value = {
+    id: item.id,
+    title: item.title,
+    category: item.category || '通用',
+    originalName: item.originalName,
+    remark: item.remark || ''
   };
   resumeDialogVisible.value = true;
 };
@@ -1003,7 +1150,7 @@ const submitResumeForm = async (): Promise<void> => {
     return;
   }
 
-  if (!selectedResumeFile.value) {
+  if (resumeDialogMode.value === 'create' && !selectedResumeFile.value) {
     resumeFormError.value = '请先选择 docx 或 pdf 简历文件';
     return;
   }
@@ -1011,9 +1158,10 @@ const submitResumeForm = async (): Promise<void> => {
   resumeFormError.value = '';
   resumeSubmitAttempted.value = true;
   emit('saveResume', {
+    id: resumeForm.value.id,
     title: resumeForm.value.title,
     category: resumeForm.value.category,
-    file: selectedResumeFile.value,
+    file: selectedResumeFile.value || undefined,
     remark: resumeForm.value.remark
   });
 };
@@ -1104,12 +1252,270 @@ const confirmDeleteResume = async (item: FileAssetListItem): Promise<void> => {
   }
 };
 
+const confirmDeleteCurrentResume = async (): Promise<void> => {
+  const resumeId = resumeForm.value.id;
+
+  if (!resumeId || props.resumeOperationLoading) {
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm('删除后会移除这份简历记录和文件，确认删除吗？', '删除简历文件', {
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      confirmButtonText: '删除',
+      confirmButtonClass: 'el-button--danger',
+      lockScroll: false,
+      modal: false,
+      type: 'warning'
+    });
+    emit('deleteResume', resumeId);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
+  }
+};
+
+/**
+ * 判断本地文件是否为支持的图片
+ * @param file - 用户选择的本地文件
+ * @returns 是否支持上传
+ * @throws 不抛出异常
+ */
+const isSupportedImageFile = (file: File): boolean => {
+  const fileName = file.name.toLowerCase();
+  const supportedByName = /\.(gif|jpe?g|png|webp)$/.test(fileName);
+  const supportedByMime = ['image/gif', 'image/jpeg', 'image/png', 'image/webp'].includes(file.type);
+  return supportedByName || supportedByMime;
+};
+
+/**
+ * 根据上传文件名生成图片标题
+ * @param fileName - 原始文件名
+ * @returns 去除扩展名后的图片标题
+ * @throws 不抛出异常
+ */
+const normalizeUploadedImageTitle = (fileName: string): string => {
+  const title = fileName.replace(/\.(gif|jpe?g|png|webp)$/i, '').replace(/[-_]+/g, ' ').trim();
+  return title || '未命名图片';
+};
+
+/**
+ * 读取上传图片并填充表单
+ * @param file - 用户选择的本地文件
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const applyUploadedImageFile = (file: File): void => {
+  if (!isSupportedImageFile(file)) {
+    imageFormError.value = '仅支持上传 jpg、jpeg、png、webp 或 gif 图片';
+    return;
+  }
+
+  if (file.size > maxImageUploadBytes) {
+    imageFormError.value = '图片文件不能超过 15MB';
+    return;
+  }
+
+  selectedImageFile.value = file;
+  imageForm.value = {
+    ...imageForm.value,
+    title: imageForm.value.title.trim() || normalizeUploadedImageTitle(file.name),
+    originalName: file.name
+  };
+  imageFormError.value = '';
+  imageFormRef.value?.clearValidate();
+  ElMessage.success('图片已选择，确认信息后保存');
+};
+
+/**
+ * 处理图片上传选择
+ * @param files - 上传组件返回的文件列表
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const handleImageFilesSelected = (files: File[]): void => {
+  const firstFile = files[0];
+
+  if (!firstFile) {
+    return;
+  }
+
+  applyUploadedImageFile(firstFile);
+};
+
+const openCreateImageDialog = (): void => {
+  imageDialogMode.value = 'create';
+  imageFormError.value = '';
+  imageSubmitAttempted.value = false;
+  selectedImageFile.value = null;
+  imageForm.value = {
+    title: '',
+    category: '证件照',
+    originalName: '',
+    remark: ''
+  };
+  imageDialogVisible.value = true;
+};
+
+const openEditImageDialog = (item: FileAssetListItem): void => {
+  imagePreviewDialogVisible.value = false;
+  imageDialogMode.value = 'edit';
+  imageFormError.value = '';
+  imageSubmitAttempted.value = false;
+  selectedImageFile.value = null;
+  imageForm.value = {
+    id: item.id,
+    title: item.title,
+    category: item.category || '其他',
+    originalName: item.originalName,
+    remark: item.remark || ''
+  };
+  imageDialogVisible.value = true;
+};
+
+const closeImageDialog = (): void => {
+  imageDialogVisible.value = false;
+  imageSubmitAttempted.value = false;
+  selectedImageFile.value = null;
+};
+
+const submitImageForm = async (): Promise<void> => {
+  if (props.imageOperationLoading) {
+    return;
+  }
+
+  if (!imageFormRef.value) {
+    return;
+  }
+
+  const valid = await imageFormRef.value.validate();
+
+  if (!valid) {
+    return;
+  }
+
+  if (imageDialogMode.value === 'create' && !selectedImageFile.value) {
+    imageFormError.value = '请先选择需要上传的图片';
+    return;
+  }
+
+  imageFormError.value = '';
+  imageSubmitAttempted.value = true;
+  emit('saveImage', {
+    id: imageForm.value.id,
+    title: imageForm.value.title,
+    category: imageForm.value.category,
+    file: selectedImageFile.value || undefined,
+    remark: imageForm.value.remark
+  });
+};
+
+/**
+ * 打开图片预览弹窗
+ * @param item - 图片文件记录
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const openImagePreviewDialog = (item: FileAssetListItem): void => {
+  if (!isImagePreviewable(item)) {
+    ElMessage.error('当前文件不是可预览图片，请重新上传图片文件');
+    return;
+  }
+
+  previewImageItem.value = item;
+  imagePreviewDialogVisible.value = true;
+};
+
+const closeImagePreviewDialog = (): void => {
+  imagePreviewDialogVisible.value = false;
+  previewImageItem.value = null;
+};
+
+/**
+ * 下载图片文件
+ * @param item - 图片文件记录
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const downloadImage = (item: FileAssetListItem): void => {
+  if (!isImagePreviewable(item)) {
+    ElMessage.error('当前文件不是可下载图片，请重新上传图片文件');
+    return;
+  }
+
+  const link = window.document.createElement('a');
+  link.href = buildImageFileUrl(item, true);
+  link.download = item.originalName;
+  link.rel = 'noreferrer';
+  window.document.body.appendChild(link);
+  link.click();
+  link.remove();
+};
+
+/**
+ * 弹窗确认删除图片文件
+ * @param item - 图片文件记录
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const confirmDeleteImage = async (item: FileAssetListItem): Promise<void> => {
+  if (props.imageOperationLoading) {
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm('删除后无法恢复，确认删除这张图片？', '删除图片', {
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      confirmButtonText: '删除',
+      confirmButtonClass: 'el-button--danger',
+      lockScroll: false,
+      modal: false,
+      type: 'warning'
+    });
+    emit('deleteImage', item.id);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
+  }
+};
+
+const confirmDeleteCurrentImage = async (): Promise<void> => {
+  const imageId = imageForm.value.id;
+
+  if (!imageId || props.imageOperationLoading) {
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm('删除后会移除这张图片记录和文件，确认删除吗？', '删除图片文件', {
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      confirmButtonText: '删除',
+      confirmButtonClass: 'el-button--danger',
+      lockScroll: false,
+      modal: false,
+      type: 'warning'
+    });
+    emit('deleteImage', imageId);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
+  }
+};
+
 watch(
   () => props.module.key,
   () => {
     passwordDialogVisible.value = false;
     documentDialogVisible.value = false;
     resumeDialogVisible.value = false;
+    imageDialogVisible.value = false;
+    imagePreviewDialogVisible.value = false;
   }
 );
 
@@ -1172,6 +1578,28 @@ watch(
   () => {
     if (resumeDialogVisible.value) {
       closeResumeDialog();
+    }
+  }
+);
+
+watch(
+  () => props.imageSuccessVersion,
+  () => {
+    if (imageDialogVisible.value) {
+      closeImageDialog();
+    }
+  }
+);
+
+watch(
+  () => props.imageDeleteSuccessVersion,
+  () => {
+    if (imageDialogVisible.value) {
+      closeImageDialog();
+    }
+
+    if (imagePreviewDialogVisible.value) {
+      closeImagePreviewDialog();
     }
   }
 );
@@ -1265,6 +1693,14 @@ watch(
             >
               <el-icon class="module-detail__button-icon"><Plus /></el-icon>
               上传简历
+            </AppButton>
+            <AppButton
+              v-if="isImageModule"
+              variant="secondary"
+              @click="openCreateImageDialog"
+            >
+              <el-icon class="module-detail__button-icon"><Plus /></el-icon>
+              上传图片
             </AppButton>
           </div>
         </div>
@@ -1385,8 +1821,67 @@ watch(
                     >
                       预览
                     </el-button>
+                    <el-button class="module-detail__resume-action" type="primary" text @click="openEditResumeDialog(item)">编辑</el-button>
                     <el-button class="module-detail__resume-action" type="danger" text @click="confirmDeleteResume(item)">删除</el-button>
                   </span>
+                </article>
+              </TransitionGroup>
+            </section>
+          </div>
+        </template>
+
+        <template v-else-if="isImageModule">
+          <div class="module-detail__image-category-grid">
+            <section
+              v-for="group in imageGroups"
+              :key="group.name"
+              class="module-detail__category-block module-detail__category-block--image"
+            >
+              <header class="module-detail__category-head">
+                <h2 class="module-detail__category-title">{{ group.name }}</h2>
+                <span class="module-detail__category-count">{{ group.items.length }} 条</span>
+              </header>
+
+              <TransitionGroup name="archive-row" tag="div" class="module-detail__image-card-list">
+                <article
+                  v-for="item in group.items"
+                  :key="item.id"
+                  class="module-detail__image-card"
+                >
+                  <button
+                    class="module-detail__image-thumb"
+                    type="button"
+                    @click="openImagePreviewDialog(item)"
+                  >
+                    <img
+                      v-if="isImagePreviewable(item)"
+                      :src="buildImageFileUrl(item)"
+                      :alt="item.title"
+                      loading="lazy"
+                    >
+                    <span v-else class="module-detail__image-thumb-fallback">
+                      {{ getImageExtensionText(item) }}
+                    </span>
+                  </button>
+
+                  <div class="module-detail__image-card-main">
+                    <span class="module-detail__simple-title">{{ item.title }}</span>
+                    <span class="module-detail__simple-meta">{{ getImageSummaryText(item) }}</span>
+                    <span class="module-detail__image-card-size">{{ formatSize(item.size) }}</span>
+                  </div>
+
+                  <div class="module-detail__image-actions">
+                    <el-button class="module-detail__image-action" text @click="openImagePreviewDialog(item)">
+                      <el-icon><View /></el-icon>
+                      预览
+                    </el-button>
+                    <el-button class="module-detail__image-action" text @click="downloadImage(item)">
+                      <el-icon><Download /></el-icon>
+                      下载
+                    </el-button>
+                    <el-button class="module-detail__image-action" type="primary" text @click="openEditImageDialog(item)">编辑</el-button>
+                    <el-button class="module-detail__image-action" type="danger" text @click="confirmDeleteImage(item)">删除</el-button>
+                  </div>
                 </article>
               </TransitionGroup>
             </section>
@@ -1837,7 +2332,7 @@ watch(
         <header class="module-detail__drawer-head">
           <div>
             <p class="module-detail__drawer-eyebrow">Resume</p>
-            <h2 class="module-detail__drawer-title">上传简历</h2>
+            <h2 class="module-detail__drawer-title">{{ resumeDialogTitle }}</h2>
           </div>
           <el-button circle text aria-label="关闭弹窗" @click="closeResumeDialog">
             <el-icon><Close /></el-icon>
@@ -1880,23 +2375,29 @@ watch(
           </el-select>
         </el-form-item>
 
-        <el-form-item class="module-detail__drawer-item module-detail__drawer-item--full module-detail__resume-upload" label="上传简历">
+        <el-form-item
+          class="module-detail__drawer-item module-detail__drawer-item--full module-detail__resume-upload"
+          :label="resumeDialogMode === 'create' ? '上传简历' : '替换文件'"
+        >
           <FileDropzone
-            title="上传 DOCX / PDF"
-            description="拖拽或选择 .docx、.pdf 文件，保存后可直接打开或下载"
+            :title="resumeDialogMode === 'create' ? '上传 DOCX / PDF' : '替换 DOCX / PDF'"
+            :description="resumeDialogMode === 'create' ? '拖拽或选择 .docx、.pdf 文件，保存后可直接打开或下载' : '拖拽或选择新的 .docx、.pdf 文件，保存后替换当前文件'"
             :accept="resumeUploadAccept"
             :multiple="false"
             @files-selected="handleResumeFilesSelected"
           />
           <p class="module-detail__resume-upload-tip">
-            保存后会写入 uploads 当前账号 resumes 目录。
+            {{ resumeDialogMode === 'create' ? '保存后会写入 uploads 当前账号 resumes 目录。' : '未选择新文件时只保存标题、分类和备注。' }}
           </p>
         </el-form-item>
 
-        <el-form-item class="module-detail__drawer-item module-detail__drawer-item--full" label="已选择文件">
+        <el-form-item class="module-detail__drawer-item module-detail__drawer-item--full" :label="resumeDialogMode === 'create' ? '已选择文件' : '当前文件'">
           <div class="module-detail__resume-selected">
             <span v-if="selectedResumeFile" class="module-detail__resume-selected-name">
               {{ resumeForm.originalName }} · {{ formatSize(selectedResumeFile.size) }}
+            </span>
+            <span v-else-if="resumeForm.originalName" class="module-detail__resume-selected-name">
+              {{ resumeForm.originalName }}
             </span>
             <span v-else class="module-detail__resume-selected-empty">尚未选择文件</span>
           </div>
@@ -1923,14 +2424,199 @@ watch(
 
       <template #footer>
         <div class="module-detail__drawer-actions">
+          <el-button
+            v-if="resumeDialogMode === 'edit' && resumeForm.id"
+            type="danger"
+            text
+            :loading="props.resumeOperationLoading"
+            @click="confirmDeleteCurrentResume"
+          >
+            删除文件
+          </el-button>
           <el-button @click="closeResumeDialog">取消</el-button>
           <el-button
             type="primary"
             :loading="props.resumeOperationLoading"
             @click="submitResumeForm"
           >
-            保存
+            {{ resumeDialogMode === 'create' ? '保存' : '保存修改' }}
           </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="imageDialogVisible"
+      class="module-detail__image-dialog"
+      width="680px"
+      :close-on-click-modal="!props.imageOperationLoading"
+      :close-on-press-escape="!props.imageOperationLoading"
+      :show-close="false"
+      :lock-scroll="false"
+      align-center
+      destroy-on-close
+    >
+      <template #header>
+        <header class="module-detail__drawer-head">
+          <div>
+            <p class="module-detail__drawer-eyebrow">Image</p>
+            <h2 class="module-detail__drawer-title">{{ imageDialogTitle }}</h2>
+          </div>
+          <el-button circle text aria-label="关闭弹窗" @click="closeImageDialog">
+            <el-icon><Close /></el-icon>
+          </el-button>
+        </header>
+      </template>
+
+      <el-form
+        ref="imageFormRef"
+        class="module-detail__drawer-form module-detail__drawer-form--element module-detail__image-form"
+        :model="imageForm"
+        :rules="imageFormRules"
+        label-position="top"
+        hide-required-asterisk
+        @submit.prevent="submitImageForm"
+      >
+        <el-form-item class="module-detail__drawer-item" label="图片标题" prop="title">
+          <el-input
+            v-model="imageForm.title"
+            placeholder="例如：蓝底证件照"
+            clearable
+          />
+        </el-form-item>
+
+        <el-form-item class="module-detail__drawer-item" label="分类" prop="category">
+          <el-select
+            v-model="imageForm.category"
+            placeholder="选择或输入分类"
+            filterable
+            allow-create
+            default-first-option
+            clearable
+          >
+            <el-option
+              v-for="category in imageCategoryOptions"
+              :key="category"
+              :label="category"
+              :value="category"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item
+          class="module-detail__drawer-item module-detail__drawer-item--full module-detail__image-upload"
+          :label="imageDialogMode === 'create' ? '上传图片' : '替换图片'"
+        >
+          <FileDropzone
+            :title="imageDialogMode === 'create' ? '上传 JPG / PNG / WEBP / GIF' : '替换 JPG / PNG / WEBP / GIF'"
+            :description="imageDialogMode === 'create' ? '拖拽或选择图片文件，保存后可预览和下载' : '不选择新文件时只保存标题、分类和备注'"
+            :accept="imageUploadAccept"
+            :multiple="false"
+            @files-selected="handleImageFilesSelected"
+          />
+          <p class="module-detail__image-upload-tip">
+            保存后会写入 uploads 当前账号 images 目录，单张图片最大 15MB。
+          </p>
+        </el-form-item>
+
+        <el-form-item class="module-detail__drawer-item module-detail__drawer-item--full" :label="imageDialogMode === 'create' ? '已选择图片' : '当前图片'">
+          <div class="module-detail__image-selected">
+            <span v-if="selectedImageFile" class="module-detail__image-selected-name">
+              {{ imageForm.originalName }} · {{ formatSize(selectedImageFile.size) }}
+            </span>
+            <span v-else-if="imageForm.originalName" class="module-detail__image-selected-name">
+              {{ imageForm.originalName }}
+            </span>
+            <span v-else class="module-detail__image-selected-empty">尚未选择图片</span>
+          </div>
+        </el-form-item>
+
+        <el-form-item class="module-detail__drawer-item module-detail__drawer-item--full" label="备注" prop="remark">
+          <el-input
+            v-model="imageForm.remark"
+            placeholder="补充图片用途或拍摄说明"
+            type="textarea"
+            :autosize="{ minRows: 3, maxRows: 5 }"
+          />
+        </el-form-item>
+
+        <el-alert
+          v-if="imageDialogErrorMessage"
+          class="module-detail__drawer-alert"
+          :title="imageDialogErrorMessage"
+          type="error"
+          show-icon
+          :closable="false"
+        />
+      </el-form>
+
+      <template #footer>
+        <div class="module-detail__drawer-actions">
+          <el-button
+            v-if="imageDialogMode === 'edit' && imageForm.id"
+            type="danger"
+            text
+            :loading="props.imageOperationLoading"
+            @click="confirmDeleteCurrentImage"
+          >
+            删除图片
+          </el-button>
+          <el-button @click="closeImageDialog">取消</el-button>
+          <el-button
+            type="primary"
+            :loading="props.imageOperationLoading"
+            @click="submitImageForm"
+          >
+            {{ imageDialogMode === 'create' ? '保存' : '保存修改' }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="imagePreviewDialogVisible"
+      class="module-detail__image-preview-dialog"
+      width="760px"
+      :show-close="false"
+      :lock-scroll="false"
+      align-center
+      destroy-on-close
+    >
+      <template #header>
+        <header class="module-detail__drawer-head">
+          <div>
+            <p class="module-detail__drawer-eyebrow">Preview</p>
+            <h2 class="module-detail__drawer-title">{{ previewImageItem?.title || '图片预览' }}</h2>
+          </div>
+          <el-button circle text aria-label="关闭预览" @click="closeImagePreviewDialog">
+            <el-icon><Close /></el-icon>
+          </el-button>
+        </header>
+      </template>
+
+      <div v-if="previewImageItem" class="module-detail__image-preview">
+        <img
+          class="module-detail__image-preview-media"
+          :src="buildImageFileUrl(previewImageItem)"
+          :alt="previewImageItem.title"
+        >
+        <div class="module-detail__image-preview-meta">
+          <span>{{ previewImageItem.originalName }}</span>
+          <span>{{ formatSize(previewImageItem.size) }}</span>
+          <span>{{ previewImageItem.updatedAt }}</span>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="module-detail__drawer-actions">
+          <el-button v-if="previewImageItem" @click="downloadImage(previewImageItem)">
+            <el-icon><Download /></el-icon>
+            下载
+          </el-button>
+          <el-button v-if="previewImageItem" type="primary" @click="openEditImageDialog(previewImageItem)">
+            编辑
+          </el-button>
+          <el-button @click="closeImagePreviewDialog">关闭</el-button>
         </div>
       </template>
     </el-dialog>

@@ -522,7 +522,8 @@
 
   /* 文档/简历卡片：用于文件类模块的紧凑卡片布局，并提供独立操作入口。 */
   &__document-category-grid,
-  &__resume-category-grid {
+  &__resume-category-grid,
+  &__image-category-grid {
     display: grid;
     gap: $space-4;
     grid-template-columns: 1fr;
@@ -530,7 +531,8 @@
   }
 
   &__category-block--document,
-  &__category-block--resume {
+  &__category-block--resume,
+  &__category-block--image {
     align-content: start;
     background: rgba(248, 251, 255, 0.64);
     border: 1px solid rgba(183, 204, 228, 0.58);
@@ -539,7 +541,8 @@
   }
 
   &__document-card-list,
-  &__resume-card-list {
+  &__resume-card-list,
+  &__image-card-list {
     display: grid;
     gap: $space-2;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -547,7 +550,8 @@
   }
 
   &__document-card,
-  &__resume-card {
+  &__resume-card,
+  &__image-card {
     align-items: center;
     background: #ffffff;
     border: 1px solid $color-border-soft;
@@ -572,21 +576,24 @@
   }
 
   &__document-card-main,
-  &__resume-card-main {
+  &__resume-card-main,
+  &__image-card-main {
     display: grid;
     gap: $space-1;
     min-width: 0;
   }
 
   &__document-card-size,
-  &__resume-card-size {
+  &__resume-card-size,
+  &__image-card-size {
     color: $color-text-soft;
     font-size: 12px;
     line-height: 1.35;
   }
 
   &__document-actions,
-  &__resume-actions {
+  &__resume-actions,
+  &__image-actions {
     align-items: center;
     display: inline-flex;
     flex: 0 0 auto;
@@ -599,11 +606,55 @@
   }
 
   &__document-action,
-  &__resume-action {
+  &__resume-action,
+  &__image-action {
     font-size: 13px;
     font-weight: 400;
     min-width: 0;
     padding: 0 $space-1;
+  }
+
+  &__image-card {
+    align-items: start;
+    grid-template-columns: 88px minmax(0, 1fr);
+    min-height: 118px;
+  }
+
+  &__image-thumb {
+    align-items: center;
+    aspect-ratio: 1;
+    background: #eef6ff;
+    border: 1px solid $color-border-soft;
+    border-radius: $radius-sm;
+    cursor: pointer;
+    display: flex;
+    height: 88px;
+    justify-content: center;
+    overflow: hidden;
+    padding: 0;
+    width: 88px;
+
+    img {
+      display: block;
+      height: 100%;
+      object-fit: cover;
+      width: 100%;
+    }
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+
+  &__image-thumb-fallback {
+    color: $color-primary;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  &__image-actions {
+    grid-column: 2;
+    justify-content: flex-start;
   }
 
   &__button-icon {
@@ -764,7 +815,8 @@
   }
 
   &__document-upload,
-  &__resume-upload {
+  &__resume-upload,
+  &__image-upload {
     :deep(.el-form-item__content) {
       display: grid;
       gap: $space-2;
@@ -784,14 +836,16 @@
   }
 
   &__document-upload-tip,
-  &__resume-upload-tip {
+  &__resume-upload-tip,
+  &__image-upload-tip {
     color: $color-text-soft;
     font-size: 12px;
     line-height: 1.5;
     margin: 0;
   }
 
-  &__resume-selected {
+  &__resume-selected,
+  &__image-selected {
     align-items: center;
     background: #ffffff;
     border: 1px solid $color-border-soft;
@@ -802,15 +856,44 @@
     width: 100%;
   }
 
-  &__resume-selected-name {
+  &__resume-selected-name,
+  &__image-selected-name {
     @include text-ellipsis;
     color: $color-text-main;
     font-size: 13px;
   }
 
-  &__resume-selected-empty {
+  &__resume-selected-empty,
+  &__image-selected-empty {
     color: $color-text-soft;
     font-size: 13px;
+  }
+
+  &__image-preview {
+    display: grid;
+    gap: $space-3;
+    justify-items: center;
+    min-width: 0;
+  }
+
+  &__image-preview-media {
+    background: #eef6ff;
+    border: 1px solid $color-border-soft;
+    border-radius: $radius-sm;
+    display: block;
+    max-height: min(58vh, 560px);
+    max-width: 100%;
+    object-fit: contain;
+  }
+
+  &__image-preview-meta {
+    color: $color-text-muted;
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 13px;
+    gap: $space-3;
+    justify-content: center;
+    min-width: 0;
   }
 
   &__document-editor-shell {
@@ -1056,7 +1139,9 @@
 
 :deep(.module-detail__password-dialog),
 :deep(.module-detail__document-dialog),
-:deep(.module-detail__resume-dialog) {
+:deep(.module-detail__resume-dialog),
+:deep(.module-detail__image-dialog),
+:deep(.module-detail__image-preview-dialog) {
   --el-dialog-bg-color: #f8fbff;
   --el-color-primary: #0284c7;
   --el-border-color: #d3e2f1;
@@ -1223,7 +1308,8 @@
     }
 
     &__document-card-list,
-    &__resume-card-list {
+    &__resume-card-list,
+    &__image-card-list {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
@@ -1268,6 +1354,8 @@
     &__document-category-grid,
     &__resume-card-list,
     &__resume-category-grid,
+    &__image-card-list,
+    &__image-category-grid,
     &__search,
     &__workspace-tools {
       grid-template-columns: 1fr;
@@ -1287,14 +1375,25 @@
     }
 
     &__document-card,
-    &__resume-card {
+    &__resume-card,
+    &__image-card {
       grid-template-columns: 40px minmax(0, 1fr);
     }
 
     &__document-actions,
-    &__resume-actions {
+    &__resume-actions,
+    &__image-actions {
       grid-column: 2;
       justify-content: flex-start;
+    }
+
+    &__image-card {
+      grid-template-columns: 76px minmax(0, 1fr);
+    }
+
+    &__image-thumb {
+      height: 76px;
+      width: 76px;
     }
 
     &__file-row,

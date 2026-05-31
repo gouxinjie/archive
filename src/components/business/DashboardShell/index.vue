@@ -8,28 +8,33 @@
  */
 
 import { computed, ref } from 'vue';
+import { ElDropdown, ElDropdownItem, ElDropdownMenu } from 'element-plus';
 import AppButton from '~/components/commons/AppButton/index.vue';
-import AppInput from '~/components/commons/AppInput/index.vue';
 import FileDropzone from '~/components/commons/FileDropzone/index.vue';
 import { APP_ENGLISH_NAME, APP_NAME, ARCHIVE_MODULES } from '~/constants/app';
 import type { DashboardSummaryData } from '~/types/api';
 import type { ArchiveModuleConfig, ArchiveModuleKey } from '~/types/models';
+
+type UserMenuCommand = 'logout';
 
 interface DashboardShellProps {
   /** 类型：DashboardSummaryData；含义：首页统计数据；是否必填：是；默认值：无 */
   summary: DashboardSummaryData;
   /** 类型：布尔值；含义：统计数据是否加载中；是否必填：是；默认值：false */
   loading: boolean;
+  /** 类型：字符串；含义：当前用户展示名称；是否必填：否；默认值：空字符串 */
+  userName?: string;
 }
 
-const props = defineProps<DashboardShellProps>();
+const props = withDefaults(defineProps<DashboardShellProps>(), {
+  userName: ''
+});
 
 const emit = defineEmits<{
   lock: [];
   openModule: [moduleKey: ArchiveModuleKey];
 }>();
 
-const searchKeyword = ref('');
 const selectedFiles = ref<File[]>([]);
 
 const moduleCounts = computed<Record<ArchiveModuleConfig['key'], number>>(() => ({
@@ -45,16 +50,8 @@ const archiveTotal = computed<number>(() => {
   return Object.values(moduleCounts.value).reduce((total, count) => total + count, 0);
 });
 
-const filteredModules = computed<readonly ArchiveModuleConfig[]>(() => {
-  const keyword = searchKeyword.value.trim().toLowerCase();
-
-  if (!keyword) {
-    return ARCHIVE_MODULES;
-  }
-
-  return ARCHIVE_MODULES.filter((item) => {
-    return item.name.toLowerCase().includes(keyword) || item.description.toLowerCase().includes(keyword);
-  });
+const userAvatarText = computed<string>(() => {
+  return props.userName.trim().slice(0, 1).toUpperCase() || 'A';
 });
 
 const handleFilesSelected = (files: File[]): void => {
@@ -64,61 +61,76 @@ const handleFilesSelected = (files: File[]): void => {
 const handleOpenModule = (moduleKey: ArchiveModuleKey): void => {
   emit('openModule', moduleKey);
 };
+
+/**
+ * 处理用户菜单命令
+ * @param command - 用户菜单命令
+ * @returns 无返回值
+ * @throws 不抛出异常
+ */
+const handleUserMenuCommand = (command: UserMenuCommand): void => {
+  if (command === 'logout') {
+    emit('lock');
+  }
+};
 </script>
 
 <template>
   <div class="dashboard-shell">
     <header class="dashboard-shell__header">
       <div class="dashboard-shell__topbar">
-      <div class="dashboard-shell__brand">
-        <span class="dashboard-shell__brand-mark">A</span>
-        <span>
-          <span class="dashboard-shell__brand-en">{{ APP_ENGLISH_NAME }}</span>
-          <strong class="dashboard-shell__brand-name">{{ APP_NAME }}</strong>
-        </span>
-      </div>
+        <div class="dashboard-shell__brand">
+          <span class="dashboard-shell__brand-mark">A</span>
+          <span>
+            <span class="dashboard-shell__brand-en">{{ APP_ENGLISH_NAME }}</span>
+            <strong class="dashboard-shell__brand-name">{{ APP_NAME }}</strong>
+          </span>
+        </div>
 
-      <div class="dashboard-shell__page-meta">
-        <span class="dashboard-shell__page-kicker">Dashboard</span>
-        <strong class="dashboard-shell__page-title">首页总览</strong>
-      </div>
+        <nav class="dashboard-shell__module-nav" aria-label="档案模块">
+          <div class="dashboard-shell__module-track">
+            <button
+              class="dashboard-shell__module-tab dashboard-shell__module-tab--active"
+              type="button"
+              aria-current="page"
+            >
+              <span>首页</span>
+            </button>
+            <button
+              v-for="module in ARCHIVE_MODULES"
+              :key="module.key"
+              class="dashboard-shell__module-tab"
+              type="button"
+              @click="handleOpenModule(module.key)"
+            >
+              <span>{{ module.name }}</span>
+            </button>
+          </div>
+        </nav>
 
-      <div class="dashboard-shell__topbar-actions">
-        <AppInput
-          v-model="searchKeyword"
-          class="dashboard-shell__search"
-          label="全局搜索"
-          type="search"
-          placeholder="搜索模块、文件、账号或备注"
-        />
-        <AppButton class="dashboard-shell__logout-button" variant="ghost" @click="emit('lock')">退出登录</AppButton>
+        <div class="dashboard-shell__topbar-actions">
+          <el-dropdown
+            class="dashboard-shell__user-menu"
+            trigger="click"
+            popper-class="dashboard-shell__avatar-menu"
+            @command="handleUserMenuCommand"
+          >
+            <button
+              class="dashboard-shell__avatar"
+              type="button"
+              :title="props.userName || '当前用户'"
+              aria-label="打开用户菜单"
+            >
+              {{ userAvatarText }}
+            </button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="logout">退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
       </div>
-      </div>
-
-      <nav class="dashboard-shell__module-nav" aria-label="档案模块">
-      <div class="dashboard-shell__module-track">
-        <button
-          class="dashboard-shell__module-tab dashboard-shell__module-tab--active"
-          type="button"
-          aria-current="page"
-        >
-          <span class="dashboard-shell__module-dot dashboard-shell__module-dot--dashboard" />
-          <span>Dashboard</span>
-          <span class="dashboard-shell__module-count">{{ props.loading ? '...' : archiveTotal }}</span>
-        </button>
-        <button
-          v-for="module in ARCHIVE_MODULES"
-          :key="module.key"
-          class="dashboard-shell__module-tab"
-          type="button"
-          @click="handleOpenModule(module.key)"
-        >
-          <span class="dashboard-shell__module-dot" :class="`dashboard-shell__module-dot--${module.tone}`" />
-          <span>{{ module.name }}</span>
-          <span class="dashboard-shell__module-count">{{ props.loading ? '...' : moduleCounts[module.key] }}</span>
-        </button>
-      </div>
-      </nav>
     </header>
 
     <main class="dashboard-shell__main">
@@ -159,12 +171,12 @@ const handleOpenModule = (moduleKey: ArchiveModuleKey): void => {
               <p class="dashboard-shell__section-kicker">Modules</p>
               <h2 class="dashboard-shell__section-title">档案模块</h2>
             </div>
-            <span class="dashboard-shell__section-count">{{ filteredModules.length }} 个模块</span>
+            <span class="dashboard-shell__section-count">{{ ARCHIVE_MODULES.length }} 个模块</span>
           </header>
 
           <div class="dashboard-shell__module-grid">
             <article
-              v-for="module in filteredModules"
+              v-for="module in ARCHIVE_MODULES"
               :key="module.key"
               class="dashboard-shell__module-row"
             >

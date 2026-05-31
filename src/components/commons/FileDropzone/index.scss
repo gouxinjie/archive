@@ -9,10 +9,8 @@
 
 .archive-dropzone {
   align-items: center;
-  background:
-    linear-gradient(135deg, rgba(2, 132, 199, 0.11), rgba(59, 130, 246, 0.06)),
-    #f7fbff;
-  border: 1px dashed rgba(14, 165, 233, 0.34);
+  background: #f8fbff;
+  border: 1px dashed #cbd9ef;
   border-radius: $radius-md;
   display: flex;
   gap: $space-4;
@@ -24,18 +22,16 @@
     transform 160ms ease;
 
   &--hovering {
-    background:
-      linear-gradient(135deg, rgba(2, 132, 199, 0.16), rgba(59, 130, 246, 0.08)),
-      #f7fbff;
-    border-color: rgba(14, 165, 233, 0.68);
+    background: #f0f6ff;
+    border-color: rgba(47, 107, 255, 0.46);
     transform: translateY(-1px);
   }
 
   &__mark {
     align-items: center;
-    background: rgba(59, 130, 246, 0.12);
-    border: 1px solid rgba(59, 130, 246, 0.28);
-    border-radius: $radius-md;
+    background: #eef4ff;
+    border: 1px solid #dbe7ff;
+    border-radius: $radius-sm;
     color: $color-primary;
     display: inline-flex;
     flex: 0 0 44px;
@@ -67,11 +63,11 @@
   &__action {
     align-items: center;
     appearance: none;
-    background: linear-gradient(135deg, #0284c7, #2563eb);
-    border: 1px solid rgba(2, 132, 199, 0.68);
+    background: $color-primary;
+    border: 1px solid $color-primary;
     border-radius: $radius-sm;
     box-sizing: border-box;
-    box-shadow: 0 8px 18px rgba(37, 99, 235, 0.2);
+    box-shadow: 0 8px 18px rgba(47, 107, 255, 0.2);
     color: #ffffff;
     cursor: pointer;
     display: inline-flex;
@@ -93,9 +89,9 @@
     white-space: nowrap;
 
     &:not(:disabled):hover {
-      background: linear-gradient(135deg, #0369a1, #1d4ed8);
-      border-color: rgba(2, 132, 199, 0.9);
-      box-shadow: 0 10px 22px rgba(37, 99, 235, 0.26);
+      background: $color-primary-hover;
+      border-color: $color-primary-hover;
+      box-shadow: 0 10px 20px rgba(47, 107, 255, 0.24);
       transform: translateY(-1px);
     }
 

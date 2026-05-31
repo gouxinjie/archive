@@ -1,7 +1,7 @@
 /**
  * 文件说明：个人档案入口页样式
- * 样式说明：定义居中密码面板、品牌区域和表单布局
- * 关键布局说明：入口页使用全屏网格居中，移动端保持窄面板可读性
+ * 样式说明：定义浅蓝背景、白色登录面板、品牌区域和表单布局
+ * 关键布局说明：入口页使用全屏居中卡片，保持与参考图一致的蓝白主题
  */
 
 @use "~/styles/variables.scss" as *;
@@ -9,8 +9,8 @@
 
 .entry-gate {
   background:
-    radial-gradient(circle at 18% 18%, rgba(59, 130, 246, 0.18), transparent 30%),
-    linear-gradient(145deg, #e8f1fb 0%, #f8fbff 48%, #d9e8f8 100%);
+    radial-gradient(circle at 72% 18%, rgba(90, 142, 255, 0.14), transparent 26%),
+    linear-gradient(180deg, #f7fbff 0%, $color-bg-main 58%, #f8fbff 100%);
   display: grid;
   min-height: 100vh;
   padding: $space-6;
@@ -18,6 +18,7 @@
 
   &__panel {
     @include panel-surface;
+    background: #ffffff;
     max-width: 420px;
     padding: $space-8;
     width: min(100%, 420px);
@@ -26,34 +27,36 @@
   &__brand {
     align-items: center;
     display: flex;
-    gap: $space-4;
+    gap: $space-3;
     margin-bottom: $space-8;
   }
 
   &__brand-mark {
     align-items: center;
-    background: linear-gradient(135deg, #0284c7, #3b82f6);
-    border-radius: $radius-md;
+    background: linear-gradient(135deg, #5b8cff 0%, $color-primary 100%);
+    border-radius: 8px;
+    box-shadow: 0 8px 18px rgba(47, 107, 255, 0.2);
     color: #ffffff;
     display: inline-flex;
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 900;
-    height: 52px;
+    height: 48px;
     justify-content: center;
-    width: 52px;
+    width: 48px;
   }
 
   &__eyebrow {
     color: $color-primary;
     font-size: 12px;
-    font-weight: 800;
+    font-weight: 700;
     letter-spacing: 0;
     margin: 0 0 $space-1;
-    text-transform: uppercase;
   }
 
   &__title {
-    font-size: 28px;
+    color: $color-text-main;
+    font-size: 26px;
+    font-weight: 800;
     line-height: 1.2;
     margin: 0;
   }
@@ -64,9 +67,9 @@
   }
 
   &__demo-tip {
-    background: rgba(14, 165, 233, 0.08);
-    border: 1px solid rgba(14, 165, 233, 0.2);
-    border-radius: $radius-sm;
+    background: #f8fbff;
+    border: 1px solid $color-border-soft;
+    border-radius: $radius-md;
     color: $color-text-muted;
     font-size: 13px;
     line-height: 1.5;
@@ -75,7 +78,7 @@
 
     strong {
       color: $color-primary;
-      font-weight: 900;
+      font-weight: 800;
     }
   }
 }

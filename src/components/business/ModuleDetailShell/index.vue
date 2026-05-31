@@ -22,6 +22,9 @@ import {
   ElAlert,
   ElButton,
   ElDialog,
+  ElDropdown,
+  ElDropdownItem,
+  ElDropdownMenu,
   ElForm,
   ElFormItem,
   ElIcon,
@@ -56,6 +59,8 @@ import type {
 } from '~/types/models';
 import { getArchiveUserId, request } from '~/utils/request';
 
+type UserMenuCommand = 'logout';
+
 interface ModuleDetailShellProps {
   /** 类型：ArchiveModuleConfig；含义：当前模块配置；是否必填：是；默认值：无 */
   module: ArchiveModuleConfig;
@@ -67,6 +72,8 @@ interface ModuleDetailShellProps {
   loading: boolean;
   /** 类型：字符串；含义：模块加载错误提示；是否必填：否；默认值：空字符串 */
   errorMessage?: string;
+  /** 类型：字符串；含义：当前用户展示名称；是否必填：否；默认值：空字符串 */
+  userName?: string;
   /** 类型：布尔值；含义：密码增删改操作是否执行中；是否必填：否；默认值：false */
   passwordOperationLoading?: boolean;
   /** 类型：字符串；含义：密码弹窗内操作错误提示；是否必填：否；默认值：空字符串 */
@@ -145,6 +152,7 @@ interface ImageFormState {
 
 const props = withDefaults(defineProps<ModuleDetailShellProps>(), {
   errorMessage: '',
+  userName: '',
   passwordOperationLoading: false,
   passwordOperationError: '',
   passwordSuccessVersion: 0,
@@ -163,6 +171,34 @@ const props = withDefaults(defineProps<ModuleDetailShellProps>(), {
   imageDeleteSuccessVersion: 0
 });
 
+const allCategoryLabel = '全部';
+const imageModuleCategoryOptions = ['证件照', '自拍照', '生活照', '旅行照', '工作照', '截图', '其他'] as const;
+const certificateModuleCategoryOptions = ['身份证明', '学历证书', '职业资格', '入职材料', '合同票据', '其他'] as const;
+
+interface CategoryAliasRule {
+  /** 类型：字符串；含义：归一化后的分类名称；是否必填：是；默认值：无 */
+  target: string;
+  /** 类型：只读字符串数组；含义：可被归入目标分类的关键词；是否必填：是；默认值：空数组 */
+  aliases: readonly string[];
+}
+
+const imageCategoryAliasRules: readonly CategoryAliasRule[] = [
+  { target: '证件照', aliases: ['证件', '头像', '蓝底', '白底', '红底'] },
+  { target: '自拍照', aliases: ['自拍', '人像', '个人照'] },
+  { target: '生活照', aliases: ['生活', '日常', '家庭', '聚会'] },
+  { target: '旅行照', aliases: ['旅行', '旅游', '风景', '出游'] },
+  { target: '工作照', aliases: ['工作', '办公', '会议', '项目'] },
+  { target: '截图', aliases: ['截图', '截屏', '屏幕'] }
+];
+
+const certificateCategoryAliasRules: readonly CategoryAliasRule[] = [
+  { target: '身份证明', aliases: ['身份证', '护照', '户口', '驾驶证', '居住证', '社保卡', '证明'] },
+  { target: '学历证书', aliases: ['学历', '学位', '毕业', '成绩', '四六级', '英语'] },
+  { target: '职业资格', aliases: ['资格', '证书', '职称', '执业', '认证', '培训'] },
+  { target: '入职材料', aliases: ['入职', '离职', '背调', '体检', '劳动', '员工'] },
+  { target: '合同票据', aliases: ['合同', '发票', '收据', '票据', '报销'] }
+];
+
 const emit = defineEmits<{
   lock: [];
   backHome: [];
@@ -179,6 +215,7 @@ const emit = defineEmits<{
 }>();
 
 const keyword = ref('');
+const activeCategory = ref(allCategoryLabel);
 const passwordDialogVisible = ref(false);
 const passwordDialogMode = ref<'create' | 'edit' | 'view'>('create');
 const passwordFormError = ref('');
@@ -283,7 +320,7 @@ const imageForm = ref<ImageFormState>({
   originalName: '',
   remark: ''
 });
-const imageCategoryOptions = ['证件照', '自拍照', '生活照', '工作照', '截图', '其他'];
+const imageCategoryOptions = [...imageModuleCategoryOptions];
 const imageUploadAccept = '.jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif';
 const maxImageUploadBytes = 15 * 1024 * 1024;
 const imageFormRules: FormRules<ImageFormState> = {
@@ -304,6 +341,7 @@ const isPasswordModule = computed<boolean>(() => props.module.key === 'passwords
 const isDocumentModule = computed<boolean>(() => props.module.key === 'documents');
 const isResumeModule = computed<boolean>(() => props.module.key === 'resumes');
 const isImageModule = computed<boolean>(() => props.module.key === 'images');
+const isCertificateModule = computed<boolean>(() => props.module.key === 'certificates');
 const isPasswordDialogReadonly = computed<boolean>(() => passwordDialogMode.value === 'view');
 const isDocumentDialogReadonly = computed<boolean>(() => documentDialogMode.value === 'view');
 const passwordDialogTitle = computed<string>(() => {
@@ -361,6 +399,10 @@ const imageDialogErrorMessage = computed<string>(() => {
   }
 
   return imageSubmitAttempted.value ? props.imageOperationError : '';
+});
+
+const userAvatarText = computed<string>(() => {
+  return props.userName.trim().slice(0, 1).toUpperCase() || 'A';
 });
 
 const passwordItems = computed<PasswordListItem[]>(() => {
@@ -426,6 +468,86 @@ const createCategoryGroups = <T>(items: T[], getCategory: (item: T) => string | 
   }));
 };
 
+/**
+ * 按预设规则归一化分类名称
+ * @param category - 原始分类名称
+ * @param options - 当前模块允许展示的分类集合
+ * @param rules - 旧分类关键词映射规则
+ * @returns 归一化后的分类名称
+ * @throws 不抛出异常
+ */
+const normalizeCategoryByRules = (
+  category: string | null | undefined,
+  options: readonly string[],
+  rules: readonly CategoryAliasRule[]
+): string => {
+  const fallbackCategory = options.includes('其他') ? '其他' : '未分类';
+  const trimmedCategory = category?.trim();
+
+  if (!trimmedCategory) {
+    return fallbackCategory;
+  }
+
+  const exactCategory = options.find((option) => option === trimmedCategory);
+
+  if (exactCategory) {
+    return exactCategory;
+  }
+
+  const normalizedCategory = trimmedCategory.toLocaleLowerCase();
+  const matchedRule = rules.find((rule) => {
+    return rule.aliases.some((alias) => normalizedCategory.includes(alias.toLocaleLowerCase()));
+  });
+
+  if (!matchedRule || !options.includes(matchedRule.target)) {
+    return fallbackCategory;
+  }
+
+  return matchedRule.target;
+};
+
+/**
+ * 按固定分类顺序整理已有分组
+ * @param groups - 已生成的分类分组
+ * @param options - 当前模块固定分类顺序
+ * @returns 排序后的分类分组
+ * @throws 不抛出异常
+ */
+const sortGroupsByCategoryOptions = <T>(groups: CategoryGroup<T>[], options: readonly string[]): CategoryGroup<T>[] => {
+  const categoryOrderMap = new Map<string, number>();
+
+  options.forEach((option, index) => {
+    categoryOrderMap.set(option, index);
+  });
+
+  return [...groups].sort((currentGroup, nextGroup) => {
+    const currentOrder = categoryOrderMap.get(currentGroup.name) ?? Number.MAX_SAFE_INTEGER;
+    const nextOrder = categoryOrderMap.get(nextGroup.name) ?? Number.MAX_SAFE_INTEGER;
+
+    return currentOrder - nextOrder;
+  });
+};
+
+/**
+ * 获取图片模块展示分类
+ * @param category - 图片原始分类
+ * @returns 图片模块归一化分类
+ * @throws 不抛出异常
+ */
+const normalizeImageCategory = (category: string | null | undefined): string => {
+  return normalizeCategoryByRules(category, imageModuleCategoryOptions, imageCategoryAliasRules);
+};
+
+/**
+ * 获取证件模块展示分类
+ * @param category - 证件原始分类
+ * @returns 证件模块归一化分类
+ * @throws 不抛出异常
+ */
+const normalizeCertificateCategory = (category: string | null | undefined): string => {
+  return normalizeCategoryByRules(category, certificateModuleCategoryOptions, certificateCategoryAliasRules);
+};
+
 const passwordGroups = computed<CategoryGroup<PasswordListItem>[]>(() => {
   return createCategoryGroups(passwordItems.value, (item) => item.category);
 });
@@ -439,12 +561,111 @@ const resumeGroups = computed<CategoryGroup<FileAssetListItem>[]>(() => {
 });
 
 const imageGroups = computed<CategoryGroup<FileAssetListItem>[]>(() => {
-  return createCategoryGroups(imageItems.value, (item) => item.category);
+  return sortGroupsByCategoryOptions(
+    createCategoryGroups(imageItems.value, (item) => normalizeImageCategory(item.category)),
+    imageModuleCategoryOptions
+  );
 });
 
 const fileGroups = computed<CategoryGroup<FileAssetListItem>[]>(() => {
+  if (isCertificateModule.value) {
+    return sortGroupsByCategoryOptions(
+      createCategoryGroups(fileItems.value, (item) => normalizeCertificateCategory(item.category)),
+      certificateModuleCategoryOptions
+    );
+  }
+
   return createCategoryGroups(fileItems.value, (item) => item.category);
 });
+
+/**
+ * 按当前快捷分类筛选分组
+ * @param groups - 当前模块的分类分组
+ * @returns 需要展示的分类分组
+ * @throws 不抛出异常
+ */
+const filterGroupsByActiveCategory = <T>(groups: CategoryGroup<T>[]): CategoryGroup<T>[] => {
+  if (activeCategory.value === allCategoryLabel) {
+    return groups;
+  }
+
+  return groups.filter((group) => group.name === activeCategory.value);
+};
+
+const categoryTabs = computed<string[]>(() => {
+  const categoryNames = (() => {
+    if (isPasswordModule.value) {
+      return passwordGroups.value.map((group) => group.name);
+    }
+
+    if (isDocumentModule.value) {
+      return documentGroups.value.map((group) => group.name);
+    }
+
+    if (isResumeModule.value) {
+      return resumeGroups.value.map((group) => group.name);
+    }
+
+    if (isImageModule.value) {
+      return [...imageModuleCategoryOptions];
+    }
+
+    if (isCertificateModule.value) {
+      return [...certificateModuleCategoryOptions];
+    }
+
+    return fileGroups.value.map((group) => group.name);
+  })();
+
+  return [allCategoryLabel, ...categoryNames];
+});
+
+const visiblePasswordGroups = computed<CategoryGroup<PasswordListItem>[]>(() => {
+  return filterGroupsByActiveCategory(passwordGroups.value);
+});
+
+const visibleDocumentGroups = computed<CategoryGroup<DocumentListItem>[]>(() => {
+  return filterGroupsByActiveCategory(documentGroups.value);
+});
+
+const visibleResumeGroups = computed<CategoryGroup<FileAssetListItem>[]>(() => {
+  return filterGroupsByActiveCategory(resumeGroups.value);
+});
+
+const visibleImageGroups = computed<CategoryGroup<FileAssetListItem>[]>(() => {
+  return filterGroupsByActiveCategory(imageGroups.value);
+});
+
+const visibleFileGroups = computed<CategoryGroup<FileAssetListItem>[]>(() => {
+  return filterGroupsByActiveCategory(fileGroups.value);
+});
+
+const visibleCategoryGroupCount = computed<number>(() => {
+  if (isPasswordModule.value) {
+    return visiblePasswordGroups.value.length;
+  }
+
+  if (isDocumentModule.value) {
+    return visibleDocumentGroups.value.length;
+  }
+
+  if (isResumeModule.value) {
+    return visibleResumeGroups.value.length;
+  }
+
+  if (isImageModule.value) {
+    return visibleImageGroups.value.length;
+  }
+
+  return visibleFileGroups.value.length;
+});
+
+const categoryContentTransitionKey = computed<string>(() => {
+  const stateKey = props.errorMessage || (props.loading && props.items.length === 0 ? 'loading' : 'ready');
+  return `${props.module.key}-${activeCategory.value}-${stateKey}-${props.items.length}-${visibleCategoryGroupCount.value}`;
+});
+
+const moduleContentTransitionKey = computed<string>(() => props.module.key);
 
 /**
  * 格式化文件大小
@@ -582,17 +803,6 @@ const getPasswordAccountCountText = (item: PasswordListItem): string => {
 };
 
 /**
- * 获取文档列表的辅助说明
- * @param item - 文档记录
- * @returns 文件名和更新时间组成的说明文本
- * @throws 不抛出异常
- */
-const getDocumentSummaryText = (item: DocumentListItem): string => {
-  const values = [item.originalName, item.updatedAt].filter((value): value is string => Boolean(value));
-  return values.join(' · ');
-};
-
-/**
  * 获取简历文件扩展名
  * @param item - 简历文件记录
  * @returns 大写扩展名
@@ -604,17 +814,6 @@ const getResumeExtensionText = (item: FileAssetListItem): string => {
 };
 
 /**
- * 获取简历列表的辅助说明
- * @param item - 简历文件记录
- * @returns 文件名、备注和更新时间组成的说明文本
- * @throws 不抛出异常
- */
-const getResumeSummaryText = (item: FileAssetListItem): string => {
-  const values = [item.originalName, item.remark, item.updatedAt].filter((value): value is string => Boolean(value));
-  return values.join(' · ');
-};
-
-/**
  * 获取图片文件扩展名
  * @param item - 图片文件记录
  * @returns 大写扩展名
@@ -623,17 +822,6 @@ const getResumeSummaryText = (item: FileAssetListItem): string => {
 const getImageExtensionText = (item: FileAssetListItem): string => {
   const extension = item.originalName.split('.').pop()?.trim();
   return extension ? extension.toUpperCase() : 'IMG';
-};
-
-/**
- * 获取图片列表的辅助说明
- * @param item - 图片文件记录
- * @returns 文件名、备注和更新时间组成的说明文本
- * @throws 不抛出异常
- */
-const getImageSummaryText = (item: FileAssetListItem): string => {
-  const values = [item.originalName, item.remark, item.updatedAt].filter((value): value is string => Boolean(value));
-  return values.join(' · ');
 };
 
 /**
@@ -667,6 +855,28 @@ const buildImageFileUrl = (item: FileAssetListItem, download = false): string =>
 
 const handleSearch = (): void => {
   emit('search', keyword.value);
+};
+
+/**
+ * 切换当前模块的快捷分类
+ * @param category - 目标分类名称
+ * @returns 无返回值
+ * @throws 不抛出异常
+ */
+const selectCategoryTab = (category: string): void => {
+  activeCategory.value = category;
+};
+
+/**
+ * 处理用户菜单命令
+ * @param command - 用户菜单命令
+ * @returns 无返回值
+ * @throws 不抛出异常
+ */
+const handleUserMenuCommand = (command: UserMenuCommand): void => {
+  if (command === 'logout') {
+    emit('lock');
+  }
 };
 
 const openCreatePasswordDrawer = (): void => {
@@ -1345,14 +1555,22 @@ const handleImageFilesSelected = (files: File[]): void => {
   applyUploadedImageFile(firstFile);
 };
 
-const openCreateImageDialog = (): void => {
+/**
+ * 打开图片上传弹窗
+ * @param category - 需要默认选中的图片分类；可选，默认使用当前分类或证件照
+ * @returns 无返回值
+ * @throws 不抛出异常
+ */
+const openCreateImageDialog = (category?: string): void => {
+  const defaultCategory = category || (activeCategory.value !== allCategoryLabel ? activeCategory.value : '证件照');
+
   imageDialogMode.value = 'create';
   imageFormError.value = '';
   imageSubmitAttempted.value = false;
   selectedImageFile.value = null;
   imageForm.value = {
     title: '',
-    category: '证件照',
+    category: defaultCategory,
     originalName: '',
     remark: ''
   };
@@ -1368,7 +1586,7 @@ const openEditImageDialog = (item: FileAssetListItem): void => {
   imageForm.value = {
     id: item.id,
     title: item.title,
-    category: item.category || '其他',
+    category: normalizeImageCategory(item.category),
     originalName: item.originalName,
     remark: item.remark || ''
   };
@@ -1511,11 +1729,22 @@ const confirmDeleteCurrentImage = async (): Promise<void> => {
 watch(
   () => props.module.key,
   () => {
+    activeCategory.value = allCategoryLabel;
+    keyword.value = '';
     passwordDialogVisible.value = false;
     documentDialogVisible.value = false;
     resumeDialogVisible.value = false;
     imageDialogVisible.value = false;
     imagePreviewDialogVisible.value = false;
+  }
+);
+
+watch(
+  categoryTabs,
+  (tabs) => {
+    if (!tabs.includes(activeCategory.value)) {
+      activeCategory.value = allCategoryLabel;
+    }
   }
 );
 
@@ -1621,32 +1850,56 @@ watch(
           </span>
         </button>
 
+        <nav class="module-detail__nav" aria-label="档案模块">
+          <div class="module-detail__nav-track">
+            <button
+              class="module-detail__nav-item"
+              type="button"
+              @click="emit('backHome')"
+            >
+              <span>首页</span>
+            </button>
+            <button
+              v-for="moduleItem in ARCHIVE_MODULES"
+              :key="moduleItem.key"
+              class="module-detail__nav-item"
+              :class="{ 'module-detail__nav-item--active': moduleItem.key === props.module.key }"
+              type="button"
+              @click="emit('openModule', moduleItem.key)"
+            >
+              <span>{{ moduleItem.name }}</span>
+            </button>
+          </div>
+        </nav>
+
         <div class="module-detail__actions">
-          <AppButton variant="ghost" @click="emit('backHome')">返回首页</AppButton>
-          <AppButton variant="ghost" @click="emit('lock')">退出登录</AppButton>
+          <el-dropdown
+            class="module-detail__user-menu"
+            trigger="click"
+            popper-class="module-detail__avatar-menu"
+            @command="handleUserMenuCommand"
+          >
+            <button
+              class="module-detail__avatar"
+              type="button"
+              :title="props.userName || '当前用户'"
+              aria-label="打开用户菜单"
+            >
+              {{ userAvatarText }}
+            </button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="logout">退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </div>
-
-      <nav class="module-detail__nav" aria-label="档案模块">
-        <div class="module-detail__nav-track">
-          <button
-            v-for="moduleItem in ARCHIVE_MODULES"
-            :key="moduleItem.key"
-            class="module-detail__nav-item"
-            :class="{ 'module-detail__nav-item--active': moduleItem.key === props.module.key }"
-            type="button"
-            @click="emit('openModule', moduleItem.key)"
-          >
-            <span class="module-detail__nav-dot" :class="`module-detail__nav-dot--${moduleItem.tone}`" />
-            <span>{{ moduleItem.name }}</span>
-            <span class="module-detail__nav-count">{{ moduleCounts[moduleItem.key] }}</span>
-          </button>
-        </div>
-      </nav>
     </header>
 
     <main class="module-detail__main">
-      <section class="module-detail__panel module-detail__panel--workspace">
+      <Transition name="module-route" mode="out-in" appear>
+        <section :key="moduleContentTransitionKey" class="module-detail__panel module-detail__panel--workspace">
         <div class="module-detail__workspace-head">
           <div class="module-detail__intro">
             <div class="module-detail__title-row">
@@ -1660,6 +1913,23 @@ watch(
             </div>
             <p class="module-detail__description">{{ props.module.description }}</p>
           </div>
+        </div>
+
+        <div class="module-detail__workspace-toolbar">
+          <nav class="module-detail__category-tabs" aria-label="快捷分类切换">
+            <button
+              v-for="category in categoryTabs"
+              :key="category"
+              class="module-detail__category-tab"
+              :class="{ 'module-detail__category-tab--active': activeCategory === category }"
+              type="button"
+              :aria-pressed="activeCategory === category"
+              @click="selectCategoryTab(category)"
+            >
+              {{ category }}
+            </button>
+          </nav>
+
           <div class="module-detail__workspace-tools">
             <form class="module-detail__search" @submit.prevent="handleSearch">
               <AppInput
@@ -1705,219 +1975,251 @@ watch(
           </div>
         </div>
 
-        <div v-if="props.errorMessage" class="module-detail__empty module-detail__empty--error">
-          {{ props.errorMessage }}
-        </div>
-        <div v-else-if="props.loading && props.items.length === 0" class="module-detail__empty">正在加载模块数据...</div>
-        <div v-else-if="props.items.length === 0" class="module-detail__empty">暂无数据</div>
+        <Transition name="archive-category" mode="out-in">
+          <div :key="categoryContentTransitionKey" class="module-detail__content-stage">
+            <div v-if="props.errorMessage" class="module-detail__empty module-detail__empty--error">
+              {{ props.errorMessage }}
+            </div>
+            <div v-else-if="props.loading && props.items.length === 0" class="module-detail__empty">正在加载模块数据...</div>
+            <div v-else-if="props.items.length === 0" class="module-detail__empty">暂无数据</div>
+            <div v-else-if="visibleCategoryGroupCount === 0" class="module-detail__empty">当前分类暂无数据</div>
 
-        <template v-else-if="isPasswordModule">
-          <section
-            v-for="group in passwordGroups"
-            :key="group.name"
-            class="module-detail__category-block"
-          >
-            <header class="module-detail__category-head">
-              <h2 class="module-detail__category-title">{{ group.name }}</h2>
-              <span class="module-detail__category-count">{{ group.items.length }} 条</span>
-            </header>
-
-            <TransitionGroup name="archive-row" tag="div" class="module-detail__simple-list">
-              <button
-                v-for="item in group.items"
-                :key="item.id"
-                class="module-detail__simple-row"
-                type="button"
-                @click="openViewPasswordDrawer(item)"
+            <template v-else-if="isPasswordModule">
+              <section
+                v-for="group in visiblePasswordGroups"
+                :key="group.name"
+                class="module-detail__category-block"
               >
-                <span class="module-detail__simple-icon module-detail__simple-icon--password" aria-hidden="true">
-                  {{ getPasswordAvatarText(item.title) }}
-                </span>
+                <header class="module-detail__category-head">
+                  <h2 class="module-detail__category-title">{{ group.name }}</h2>
+                  <span class="module-detail__category-count">{{ group.items.length }} 条</span>
+                </header>
 
-                <span class="module-detail__simple-main">
-                  <span class="module-detail__simple-title">{{ item.title }}</span>
-                  <span class="module-detail__simple-meta">{{ getPasswordSummaryText(item) }}</span>
-                </span>
-
-                <span class="module-detail__simple-count">{{ getPasswordAccountCountText(item) }}</span>
-                <el-icon class="module-detail__simple-arrow"><ArrowRight /></el-icon>
-              </button>
-            </TransitionGroup>
-          </section>
-        </template>
-
-        <template v-else-if="isDocumentModule">
-          <div class="module-detail__document-category-grid">
-            <section
-              v-for="group in documentGroups"
-              :key="group.name"
-              class="module-detail__category-block module-detail__category-block--document"
-            >
-              <header class="module-detail__category-head">
-                <h2 class="module-detail__category-title">{{ group.name }}</h2>
-                <span class="module-detail__category-count">{{ group.items.length }} 条</span>
-              </header>
-
-              <TransitionGroup name="archive-row" tag="div" class="module-detail__document-card-list">
-                <article
-                  v-for="item in group.items"
-                  :key="item.id"
-                  class="module-detail__document-card"
-                >
-                  <span class="module-detail__simple-icon module-detail__simple-icon--document" aria-hidden="true">
-                    {{ item.fileType.toUpperCase() }}
-                  </span>
-
-                  <span class="module-detail__document-card-main">
-                    <span class="module-detail__simple-title">{{ item.title }}</span>
-                    <span class="module-detail__simple-meta">{{ getDocumentSummaryText(item) }}</span>
-                    <span class="module-detail__document-card-size">{{ formatSize(item.size) }}</span>
-                  </span>
-
-                  <span class="module-detail__document-actions">
-                    <el-button class="module-detail__document-action" text @click="openViewDocumentDialog(item)">查看</el-button>
-                    <el-button class="module-detail__document-action" type="primary" text @click="openEditDocumentDialog(item)">编辑</el-button>
-                  </span>
-                </article>
-              </TransitionGroup>
-            </section>
-          </div>
-        </template>
-
-        <template v-else-if="isResumeModule">
-          <div class="module-detail__resume-category-grid">
-            <section
-              v-for="group in resumeGroups"
-              :key="group.name"
-              class="module-detail__category-block module-detail__category-block--resume"
-            >
-              <header class="module-detail__category-head">
-                <h2 class="module-detail__category-title">{{ group.name }}</h2>
-                <span class="module-detail__category-count">{{ group.items.length }} 条</span>
-              </header>
-
-              <TransitionGroup name="archive-row" tag="div" class="module-detail__resume-card-list">
-                <article
-                  v-for="item in group.items"
-                  :key="item.id"
-                  class="module-detail__resume-card"
-                >
-                  <span class="module-detail__simple-icon module-detail__simple-icon--resume" aria-hidden="true">
-                    {{ getResumeExtensionText(item) }}
-                  </span>
-
-                  <span class="module-detail__resume-card-main">
-                    <span class="module-detail__simple-title">{{ item.title }}</span>
-                    <span class="module-detail__simple-meta">{{ getResumeSummaryText(item) }}</span>
-                    <span class="module-detail__resume-card-size">{{ formatSize(item.size) }}</span>
-                  </span>
-
-                  <span class="module-detail__resume-actions">
-                    <el-button
-                      class="module-detail__resume-action"
-                      text
-                      :loading="resumePreviewingId === item.id"
-                      @click="openResumeFile(item)"
-                    >
-                      预览
-                    </el-button>
-                    <el-button class="module-detail__resume-action" type="primary" text @click="openEditResumeDialog(item)">编辑</el-button>
-                    <el-button class="module-detail__resume-action" type="danger" text @click="confirmDeleteResume(item)">删除</el-button>
-                  </span>
-                </article>
-              </TransitionGroup>
-            </section>
-          </div>
-        </template>
-
-        <template v-else-if="isImageModule">
-          <div class="module-detail__image-category-grid">
-            <section
-              v-for="group in imageGroups"
-              :key="group.name"
-              class="module-detail__category-block module-detail__category-block--image"
-            >
-              <header class="module-detail__category-head">
-                <h2 class="module-detail__category-title">{{ group.name }}</h2>
-                <span class="module-detail__category-count">{{ group.items.length }} 条</span>
-              </header>
-
-              <TransitionGroup name="archive-row" tag="div" class="module-detail__image-card-list">
-                <article
-                  v-for="item in group.items"
-                  :key="item.id"
-                  class="module-detail__image-card"
-                >
+                <TransitionGroup name="archive-row" tag="div" class="module-detail__simple-list">
                   <button
-                    class="module-detail__image-thumb"
+                    v-for="item in group.items"
+                    :key="item.id"
+                    class="module-detail__simple-row"
                     type="button"
-                    @click="openImagePreviewDialog(item)"
+                    @click="openViewPasswordDrawer(item)"
                   >
-                    <img
-                      v-if="isImagePreviewable(item)"
-                      :src="buildImageFileUrl(item)"
-                      :alt="item.title"
-                      loading="lazy"
-                    >
-                    <span v-else class="module-detail__image-thumb-fallback">
-                      {{ getImageExtensionText(item) }}
+                    <span class="module-detail__simple-icon module-detail__simple-icon--password" aria-hidden="true">
+                      {{ getPasswordAvatarText(item.title) }}
                     </span>
+
+                    <span class="module-detail__simple-main">
+                      <span class="module-detail__simple-title">{{ item.title }}</span>
+                      <span class="module-detail__simple-meta">{{ getPasswordSummaryText(item) }}</span>
+                    </span>
+
+                    <span class="module-detail__simple-count">{{ getPasswordAccountCountText(item) }}</span>
+                    <el-icon class="module-detail__simple-arrow"><ArrowRight /></el-icon>
                   </button>
+                </TransitionGroup>
+              </section>
+            </template>
 
-                  <div class="module-detail__image-card-main">
-                    <span class="module-detail__simple-title">{{ item.title }}</span>
-                    <span class="module-detail__simple-meta">{{ getImageSummaryText(item) }}</span>
-                    <span class="module-detail__image-card-size">{{ formatSize(item.size) }}</span>
-                  </div>
+            <template v-else-if="isDocumentModule">
+              <div class="module-detail__document-category-grid">
+                <section
+                  v-for="group in visibleDocumentGroups"
+                  :key="group.name"
+                  class="module-detail__category-block module-detail__category-block--document"
+                >
+                  <header class="module-detail__category-head">
+                    <h2 class="module-detail__category-title">{{ group.name }}</h2>
+                    <span class="module-detail__category-count">{{ group.items.length }} 条</span>
+                  </header>
 
-                  <div class="module-detail__image-actions">
-                    <el-button class="module-detail__image-action" text @click="openImagePreviewDialog(item)">
-                      <el-icon><View /></el-icon>
-                      预览
-                    </el-button>
-                    <el-button class="module-detail__image-action" text @click="downloadImage(item)">
-                      <el-icon><Download /></el-icon>
-                      下载
-                    </el-button>
-                    <el-button class="module-detail__image-action" type="primary" text @click="openEditImageDialog(item)">编辑</el-button>
-                    <el-button class="module-detail__image-action" type="danger" text @click="confirmDeleteImage(item)">删除</el-button>
-                  </div>
-                </article>
-              </TransitionGroup>
-            </section>
+                  <TransitionGroup name="archive-row" tag="div" class="module-detail__document-card-list">
+                    <article
+                      v-for="item in group.items"
+                      :key="item.id"
+                      class="module-detail__document-card"
+                    >
+                      <span
+                        class="module-detail__simple-icon module-detail__simple-icon--document"
+                        :class="`module-detail__simple-icon--document-${item.fileType}`"
+                        aria-hidden="true"
+                      >
+                        {{ item.fileType.toUpperCase() }}
+                      </span>
+
+                      <span class="module-detail__document-card-main">
+                        <span class="module-detail__simple-title">{{ item.title }}</span>
+                        <span class="module-detail__simple-meta">{{ item.originalName }}</span>
+                        <span class="module-detail__document-card-meta">
+                          <span class="module-detail__document-card-size">{{ formatSize(item.size) }}</span>
+                          <span class="module-detail__document-card-date">{{ item.updatedAt }}</span>
+                        </span>
+                      </span>
+
+                      <span class="module-detail__document-actions">
+                        <el-button class="module-detail__document-action" text @click="openViewDocumentDialog(item)">查看</el-button>
+                        <el-button class="module-detail__document-action" type="primary" text @click="openEditDocumentDialog(item)">编辑</el-button>
+                      </span>
+                    </article>
+                  </TransitionGroup>
+                </section>
+              </div>
+            </template>
+
+            <template v-else-if="isResumeModule">
+              <div class="module-detail__resume-category-grid">
+                <section
+                  v-for="group in visibleResumeGroups"
+                  :key="group.name"
+                  class="module-detail__category-block module-detail__category-block--resume"
+                >
+                  <header class="module-detail__category-head">
+                    <h2 class="module-detail__category-title">{{ group.name }}</h2>
+                    <span class="module-detail__category-count">{{ group.items.length }} 条</span>
+                  </header>
+
+                  <TransitionGroup name="archive-row" tag="div" class="module-detail__resume-card-list">
+                    <article
+                      v-for="item in group.items"
+                      :key="item.id"
+                      class="module-detail__resume-card"
+                    >
+                      <span
+                        class="module-detail__simple-icon module-detail__simple-icon--resume"
+                        :class="`module-detail__simple-icon--resume-${getResumeExtensionText(item).toLowerCase()}`"
+                        aria-hidden="true"
+                      >
+                        {{ getResumeExtensionText(item) }}
+                      </span>
+
+                      <span class="module-detail__resume-card-main">
+                        <span class="module-detail__simple-title">{{ item.title }}</span>
+                        <span class="module-detail__simple-meta">{{ item.originalName }}</span>
+                        <span class="module-detail__resume-card-date">{{ item.updatedAt }}</span>
+                        <span class="module-detail__resume-card-size">{{ formatSize(item.size) }}</span>
+                      </span>
+
+                      <span class="module-detail__resume-actions">
+                        <el-button
+                          class="module-detail__resume-action"
+                          text
+                          :loading="resumePreviewingId === item.id"
+                          @click="openResumeFile(item)"
+                        >
+                          预览
+                        </el-button>
+                        <el-button class="module-detail__resume-action" type="primary" text @click="openEditResumeDialog(item)">编辑</el-button>
+                        <el-button class="module-detail__resume-action" type="danger" text @click="confirmDeleteResume(item)">删除</el-button>
+                      </span>
+                    </article>
+                  </TransitionGroup>
+                </section>
+              </div>
+            </template>
+
+            <template v-else-if="isImageModule">
+              <div class="module-detail__image-category-grid">
+                <section
+                  v-for="group in visibleImageGroups"
+                  :key="group.name"
+                  class="module-detail__category-block module-detail__category-block--image"
+                >
+                  <header class="module-detail__category-head">
+                    <h2 class="module-detail__category-title">{{ group.name }}</h2>
+                    <span class="module-detail__category-count">{{ group.items.length }} 条</span>
+                  </header>
+
+                  <TransitionGroup name="archive-row" tag="div" class="module-detail__image-card-list">
+                    <article
+                      v-for="item in group.items"
+                      :key="item.id"
+                      class="module-detail__image-card"
+                    >
+                      <button
+                        class="module-detail__image-thumb"
+                        type="button"
+                        @click="openImagePreviewDialog(item)"
+                      >
+                        <img
+                          v-if="isImagePreviewable(item)"
+                          :src="buildImageFileUrl(item)"
+                          :alt="item.title"
+                          loading="lazy"
+                        >
+                        <span v-else class="module-detail__image-thumb-fallback">
+                          {{ getImageExtensionText(item) }}
+                        </span>
+                      </button>
+
+                      <div class="module-detail__image-card-main">
+                        <span class="module-detail__simple-title">{{ item.title }}</span>
+                        <span class="module-detail__image-card-meta">
+                          <span>{{ item.updatedAt }}</span>
+                          <span>{{ formatSize(item.size) }}</span>
+                        </span>
+                      </div>
+
+                      <div class="module-detail__image-actions">
+                        <el-button class="module-detail__image-action" text aria-label="预览图片" @click="openImagePreviewDialog(item)">
+                          <el-icon><View /></el-icon>
+                        </el-button>
+                        <el-button class="module-detail__image-action" text aria-label="下载图片" @click="downloadImage(item)">
+                          <el-icon><Download /></el-icon>
+                        </el-button>
+                        <el-button class="module-detail__image-action" type="primary" text aria-label="编辑图片" @click="openEditImageDialog(item)">
+                          <el-icon><EditPen /></el-icon>
+                        </el-button>
+                        <el-button class="module-detail__image-action" type="danger" text aria-label="删除图片" @click="confirmDeleteImage(item)">
+                          <el-icon><Delete /></el-icon>
+                        </el-button>
+                      </div>
+                    </article>
+
+                    <button
+                      :key="`upload-${group.name}`"
+                      class="module-detail__image-upload-card"
+                      type="button"
+                      @click="openCreateImageDialog(group.name)"
+                    >
+                      <el-icon class="module-detail__image-upload-icon"><Plus /></el-icon>
+                      <span>上传新图片</span>
+                    </button>
+                  </TransitionGroup>
+                </section>
+              </div>
+            </template>
+
+            <template v-else>
+              <section
+                v-for="group in visibleFileGroups"
+                :key="group.name"
+                class="module-detail__category-block"
+              >
+                <header class="module-detail__category-head">
+                  <h2 class="module-detail__category-title">{{ group.name }}</h2>
+                  <span class="module-detail__category-count">{{ group.items.length }} 条</span>
+                </header>
+
+                <TransitionGroup name="archive-row" tag="div" class="module-detail__file-list">
+                  <article v-for="item in group.items" :key="item.id" class="module-detail__file-row">
+                    <div class="module-detail__file-type">
+                      <span class="module-detail__file-extension">{{ item.originalName.split('.').pop() || 'file' }}</span>
+                    </div>
+                    <div class="module-detail__file-content">
+                      <h3 class="module-detail__file-title">{{ item.title }}</h3>
+                      <p class="module-detail__file-remark">{{ item.remark || item.originalName }}</p>
+                    </div>
+                    <div class="module-detail__file-meta">
+                      <span>{{ item.mimeType }}</span>
+                      <span>{{ formatSize(item.size) }}</span>
+                      <span>{{ item.updatedAt }}</span>
+                    </div>
+                  </article>
+                </TransitionGroup>
+              </section>
+            </template>
           </div>
-        </template>
-
-        <template v-else>
-          <section
-            v-for="group in fileGroups"
-            :key="group.name"
-            class="module-detail__category-block"
-          >
-            <header class="module-detail__category-head">
-              <h2 class="module-detail__category-title">{{ group.name }}</h2>
-              <span class="module-detail__category-count">{{ group.items.length }} 条</span>
-            </header>
-
-            <TransitionGroup name="archive-row" tag="div" class="module-detail__file-list">
-              <article v-for="item in group.items" :key="item.id" class="module-detail__file-row">
-                <div class="module-detail__file-type">
-                  <span class="module-detail__file-extension">{{ item.originalName.split('.').pop() || 'file' }}</span>
-                </div>
-                <div class="module-detail__file-content">
-                  <h3 class="module-detail__file-title">{{ item.title }}</h3>
-                  <p class="module-detail__file-remark">{{ item.remark || item.originalName }}</p>
-                </div>
-                <div class="module-detail__file-meta">
-                  <span>{{ item.mimeType }}</span>
-                  <span>{{ formatSize(item.size) }}</span>
-                  <span>{{ item.updatedAt }}</span>
-                </div>
-              </article>
-            </TransitionGroup>
-          </section>
-        </template>
-      </section>
+        </Transition>
+        </section>
+      </Transition>
     </main>
 
     <el-dialog

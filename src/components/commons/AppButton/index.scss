@@ -1,6 +1,6 @@
 /**
  * 文件说明：通用按钮组件样式
- * 样式说明：定义按钮尺寸、状态、加载动效和冷色调变体
+ * 样式说明：定义按钮尺寸、状态、加载动效和冷色工作台变体
  * 关键布局说明：按钮使用 inline-flex 保证图标和文本垂直居中
  */
 
@@ -12,13 +12,13 @@
   border: 1px solid transparent;
   border-radius: $radius-sm;
   display: inline-flex;
-  font-size: 14px;
-  font-weight: 400;
+  font-size: 13px;
+  font-weight: 600;
   gap: $space-2;
   justify-content: center;
   line-height: 1;
-  min-height: 36px;
-  padding: 0 $space-3;
+  min-height: 34px;
+  padding: 0 $space-4;
   transition:
     background 160ms ease,
     border-color 160ms ease,
@@ -40,6 +40,8 @@
 
   &--primary {
     background: $color-primary;
+    border-color: $color-primary;
+    box-shadow: 0 8px 18px rgba(47, 107, 255, 0.22);
     color: #ffffff;
 
     &:not(:disabled):hover {
@@ -48,26 +50,27 @@
   }
 
   &--secondary {
-    background: rgba(14, 165, 233, 0.1);
-    border-color: rgba(14, 165, 233, 0.24);
-    color: $color-accent;
+    background: $color-primary;
+    border-color: $color-primary;
+    box-shadow: 0 8px 18px rgba(47, 107, 255, 0.2);
+    color: #ffffff;
   }
 
   &--danger {
-    background: rgba(251, 113, 133, 0.12);
-    border-color: rgba(251, 113, 133, 0.3);
+    background: rgba(255, 95, 115, 0.08);
+    border-color: rgba(255, 95, 115, 0.22);
     color: $color-danger;
   }
 
   &--ghost {
-    background: rgba(255, 255, 255, 0.34);
-    border-color: $color-border;
+    background: transparent;
+    border-color: transparent;
     color: $color-text-muted;
   }
 
   &__spinner {
     animation: archive-button-spin 720ms linear infinite;
-    border: 2px solid rgba(255, 255, 255, 0.44);
+    border: 2px solid rgba(255, 255, 255, 0.42);
     border-radius: 999px;
     border-top-color: #ffffff;
     height: 16px;

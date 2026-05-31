@@ -72,6 +72,15 @@ let moduleRequestSerial = 0;
 const activeModuleLoadSignature = useState<string>('archive-module-active-load-signature', () => '');
 
 const currentProfileId = computed<string | null>(() => session.status.value.userId || session.status.value.profileId || null);
+const currentUserName = computed<string>(() => {
+  return (
+    session.status.value.displayName ||
+    session.status.value.profileName ||
+    session.status.value.username ||
+    session.status.value.userId ||
+    'Archive'
+  );
+});
 
 const moduleKey = computed<ArchiveModuleKey | null>(() => {
   const value = route.params.module;
@@ -589,6 +598,7 @@ watch(
     :items="currentItems"
     :loading="loading"
     :error-message="moduleError"
+    :user-name="currentUserName"
     :password-operation-loading="passwordOperationLoading"
     :password-operation-error="passwordOperationError"
     :password-success-version="passwordSuccessVersion"

@@ -7,13 +7,17 @@
  * @updated 2026-05-29
  */
 
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import DashboardShell from '~/components/business/DashboardShell/index.vue';
 import EntryGate from '~/components/business/EntryGate/index.vue';
 import { useArchiveSession } from '~/composables/useArchiveSession';
 import type { DashboardSummaryData } from '~/types/api';
 import type { ArchiveModuleKey } from '~/types/models';
 import { request } from '~/utils/request';
+
+definePageMeta({
+  pageTransition: false
+});
 
 const session = useArchiveSession();
 const summary = ref<DashboardSummaryData>({
@@ -25,6 +29,16 @@ const summary = ref<DashboardSummaryData>({
   studyCount: 0
 });
 const summaryLoading = ref(false);
+
+const currentUserName = computed<string>(() => {
+  return (
+    session.status.value.displayName ||
+    session.status.value.profileName ||
+    session.status.value.username ||
+    session.status.value.userId ||
+    'Archive'
+  );
+});
 
 const loadSummary = async (): Promise<void> => {
   if (summaryLoading.value) {
@@ -89,6 +103,7 @@ watch(
     v-else
     :summary="summary"
     :loading="summaryLoading"
+    :user-name="currentUserName"
     @lock="handleLock"
     @open-module="handleOpenModule"
   />

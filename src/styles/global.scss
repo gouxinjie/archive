@@ -11,10 +11,27 @@ body {
   font-family: $font-family-base;
 }
 
+:root {
+  --el-color-primary: #2f6bff;
+  --el-color-primary-light-3: #6d96ff;
+  --el-color-primary-light-5: #9ab8ff;
+  --el-color-primary-light-7: #c9d9ff;
+  --el-color-primary-light-9: #edf3ff;
+  --el-bg-color: #ffffff;
+  --el-bg-color-overlay: #ffffff;
+  --el-border-color: #dfe8f5;
+  --el-border-color-light: #e8eef7;
+  --el-fill-color-light: #f7faff;
+  --el-text-color-primary: #15213b;
+  --el-text-color-regular: #687891;
+  --el-text-color-placeholder: #a4b0c2;
+  --el-mask-color: rgba(21, 33, 59, 0.28);
+}
+
 .archive-page-loading {
   align-items: center;
   background: $color-bg-main;
-  color: $color-text-muted;
+  color: $color-primary;
   display: grid;
   font-size: 14px;
   min-height: 100vh;
@@ -24,18 +41,48 @@ body {
 .page-enter-active,
 .page-leave-active {
   transition:
-    opacity 180ms ease,
-    transform 180ms ease;
+    filter 220ms ease,
+    opacity 220ms ease,
+    transform 220ms ease;
 }
 
 .page-enter-from,
 .page-leave-to {
+  filter: blur(2px);
   opacity: 0;
-  transform: translateY(6px);
+  transform: translateY(8px) scale(0.996);
+}
+
+/* 模块路由切换：同一动态路由参数变化时由页面层触发。 */
+.module-route-enter-active,
+.module-route-leave-active {
+  transition:
+    filter 240ms ease,
+    opacity 240ms ease,
+    transform 240ms ease;
+}
+
+.module-route-enter-from {
+  filter: blur(2px);
+  opacity: 0;
+  transform: translateX(14px) scale(0.996);
+}
+
+.module-route-leave-to {
+  filter: blur(1px);
+  opacity: 0;
+  transform: translateX(-10px) scale(0.998);
+}
+
+.module-route-enter-to,
+.module-route-leave-from {
+  filter: blur(0);
+  opacity: 1;
+  transform: translateX(0) scale(1);
 }
 
 ::selection {
-  background: rgba(59, 130, 246, 0.22);
+  background: rgba(47, 107, 255, 0.18);
   color: $color-text-main;
 }
 
@@ -45,11 +92,28 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #b5cadc;
+  background: #c6d6ee;
   border: 2px solid $color-bg-main;
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #e3edf6;
+  background: #eef5ff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter-active,
+  .page-leave-active,
+  .module-route-enter-active,
+  .module-route-leave-active {
+    transition-duration: 1ms;
+  }
+
+  .page-enter-from,
+  .page-leave-to,
+  .module-route-enter-from,
+  .module-route-leave-to {
+    filter: none;
+    transform: none;
+  }
 }

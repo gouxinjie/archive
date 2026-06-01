@@ -27,7 +27,7 @@ sudo mkdir -p /var/www/archive-data/uploads
 
 ## ECS 首次准备
 
-安装 Node.js、Git、tar 和 PM2。Node.js 版本建议与 GitHub Actions 中一致，当前工作流使用 Node.js 22。
+安装 Node.js、Git、tar、npm 和 PM2。Node.js 版本建议与 GitHub Actions 中一致，当前工作流使用 Node.js 22。
 
 ```bash
 npm install -g pm2
@@ -43,9 +43,9 @@ vim /var/www/archive/.env.production
 
 ```text
 NODE_ENV=production
-HOST=0.0.0.0
+HOST=127.0.0.1
 PORT=3000
-NUXT_PUBLIC_ORIGIN=https://你的域名
+NUXT_PUBLIC_ORIGIN=http://你的域名或公网IP:8081
 NUXT_SESSION_SECRET=随机强密钥
 NUXT_FILE_PREVIEW_SECRET=随机强密钥
 NUXT_DATABASE_PATH=/var/www/archive-data/data/archive.db
@@ -113,6 +113,7 @@ GitHub Actions
 ECS
   -> 解压覆盖到 /var/www/archive
   -> 删除临时压缩包 deploy-artifact.tar.gz
+  -> 在 ECS 上执行 npm rebuild better-sqlite3
   -> PM2 startOrReload /var/www/archive/ecosystem.config.cjs
 ```
 
@@ -124,18 +125,18 @@ PM2 会读取 `/var/www/archive/.env.production`，并启动：
 
 ## Nginx 反向代理示例
 
-Node 服务默认监听：
+Node 服务由 PM2 启动，只监听 ECS 本机：
 
 ```text
 http://127.0.0.1:3000
 ```
 
-Nginx 可以反向代理到该端口：
+Nginx 对外监听 `8081`，再反向代理到本机 `3000`：
 
 ```nginx
 server {
-  listen 80;
-  server_name archive.example.com;
+  listen 8081;
+  server_name _;
 
   location / {
     proxy_pass http://127.0.0.1:3000;
@@ -148,7 +149,7 @@ server {
 }
 ```
 
-生产环境建议配置 HTTPS，并把 `.env.production` 中的 `NUXT_PUBLIC_ORIGIN` 改成 HTTPS 地址。
+如果后续绑定域名并配置 HTTPS，可以再把 `listen 8081` 调整为 HTTPS 配置，并同步修改 `.env.production` 中的 `NUXT_PUBLIC_ORIGIN`。
 
 ## 注意事项
 
@@ -157,6 +158,8 @@ server {
 `/var/www/archive-data/data` 和 `/var/www/archive-data/uploads` 是持久化数据目录，不要放在每次发布会被覆盖的目录里。
 
 直接覆盖部署更简单，但没有 release 目录回滚能力。如果新版本异常，需要重新运行上一次稳定提交的 workflow。
+
+项目使用了 `better-sqlite3`，它是原生模块。即使产物在 GitHub Actions 上构建完成，部署到 ECS 后仍需要按 ECS 当前 Node 版本执行一次 `npm rebuild better-sqlite3`。当前工作流已经自动执行这一步。
 
 备份时至少备份：
 

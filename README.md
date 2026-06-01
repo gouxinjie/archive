@@ -98,7 +98,7 @@ NUXT_DEMO_ACCOUNT_PASSWORD=123456
 
 - `NODE_ENV`：运行环境，本地开发使用 `development`，生产部署必须为 `production`。
 - `HOST` / `PORT`：Nuxt 服务监听地址和端口。
-- `NUXT_PUBLIC_ORIGIN`：生产访问地址，必须改为 ECS 域名或公网 HTTPS 地址。
+- `NUXT_PUBLIC_ORIGIN`：生产访问地址，必须改为 ECS 域名或公网 IP，可按 Nginx 对外端口填写。
 - `NUXT_OWNER_USER_ID`：单人系统请求标识，通常保持 `owner`。
 - `NUXT_SESSION_SECRET`：会话签名密钥，部署时必须替换为随机字符串。
 - `NUXT_FILE_PREVIEW_SECRET`：文件预览访问密钥，部署时必须替换。
@@ -211,6 +211,12 @@ ECS 推荐部署根目录为：
 ```
 
 使用 GitHub Actions 自动部署时，该目录保存 `.env.production`、`.output` 和 `ecosystem.config.cjs`，不要求保存完整源码。
+
+生产推荐访问链路：
+
+```text
+公网访问 8081 -> Nginx -> 127.0.0.1:3000 -> Nuxt/PM2
+```
 
 构建生产版本：
 

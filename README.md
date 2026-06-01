@@ -204,11 +204,13 @@ npm run db:seed
 
 ## 部署提示
 
-ECS 推荐项目代码目录为：
+ECS 推荐部署根目录为：
 
 ```text
 /var/www/archive
 ```
+
+使用 GitHub Actions 自动部署时，该目录保存 `.env.production`、`.output` 和 `ecosystem.config.cjs`，不要求保存完整源码。
 
 构建生产版本：
 

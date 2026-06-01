@@ -6,71 +6,191 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: archive-ecs
+  cancel-in-progress: true
+
 jobs:
   deploy:
-    name: Deploy Archive
+    name: Build artifact and deploy Archive
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      ECS_HOST: ${{ secrets.ECS_HOST }}
+      ECS_USER: ${{ secrets.ECS_USER }}
+      ECS_PORT: ${{ secrets.ECS_PORT }}
+      ECS_APP_DIR: ${{ secrets.ECS_APP_DIR }}
+      ECS_DATA_ROOT: ${{ secrets.ECS_DATA_ROOT }}
+      ECS_SSH_KEY: ${{ secrets.ECS_SSH_KEY }}
+      PM2_NAME: archive
+      APP_PORT: "3000"
+      APP_HOST: 127.0.0.1
 
     steps:
-      - name: Deploy by SSH
-        uses: appleboy/ssh-action@v1.2.0
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          host: ${{ secrets.ECS_HOST }}
-          username: ${{ secrets.ECS_USER }}
-          key: ${{ secrets.ECS_SSH_KEY }}
-          port: ${{ secrets.ECS_PORT || '22' }}
-          script_stop: true
-          script: |
-            set -e
+          node-version: "22"
+          cache: "npm"
 
-            APP_DIR="${{ secrets.ECS_APP_DIR }}"
-            if [ -z "$APP_DIR" ]; then
-              APP_DIR="/var/www/archive"
-            fi
+      - name: Validate deploy config
+        run: |
+          set -e
 
-            DATA_ROOT="${{ secrets.ECS_DATA_ROOT }}"
-            if [ -z "$DATA_ROOT" ]; then
-              DATA_ROOT="/var/www/archive-data"
-            fi
+          test -n "$ECS_HOST" || (echo "Missing ECS_HOST" && exit 1)
+          test -n "$ECS_USER" || (echo "Missing ECS_USER" && exit 1)
+          test -n "$ECS_SSH_KEY" || (echo "Missing ECS_SSH_KEY" && exit 1)
 
-            REPOSITORY_URL="https://github.com/${{ github.repository }}.git"
+          if [ -z "$ECS_PORT" ]; then
+            echo "ECS_PORT=22" >> "$GITHUB_ENV"
+            ECS_PORT="22"
+          fi
 
-            mkdir -p "$APP_DIR"
-            cd "$APP_DIR"
+          if [ -z "$ECS_APP_DIR" ]; then
+            echo "ECS_APP_DIR=/var/www/archive" >> "$GITHUB_ENV"
+            ECS_APP_DIR="/var/www/archive"
+          fi
 
-            if [ ! -d ".git" ]; then
-              git init
-              git remote add origin "$REPOSITORY_URL"
-            elif git remote get-url origin > /dev/null 2>&1; then
-              git remote set-url origin "$REPOSITORY_URL"
-            else
-              git remote add origin "$REPOSITORY_URL"
-            fi
+          if [ -z "$ECS_DATA_ROOT" ]; then
+            echo "ECS_DATA_ROOT=/var/www/archive-data" >> "$GITHUB_ENV"
+            ECS_DATA_ROOT="/var/www/archive-data"
+          fi
 
-            git fetch --depth=1 origin main
-            git reset --hard origin/main
+          case "$ECS_APP_DIR" in
+            /*) ;;
+            *) echo "ECS_APP_DIR must be an absolute path" && exit 1 ;;
+          esac
 
-            if [ ! -f ".env.production" ]; then
-              echo "缺少 .env.production，请先在 ECS 的 $APP_DIR 下创建生产环境变量文件。"
+          case "$ECS_DATA_ROOT" in
+            /*) ;;
+            *) echo "ECS_DATA_ROOT must be an absolute path" && exit 1 ;;
+          esac
+
+          case "$ECS_APP_DIR" in
+            "/"|"/var"|"/var/"|"/var/www"|"/var/www/"|*..*|*"'"*)
+              echo "Unsafe ECS_APP_DIR: $ECS_APP_DIR"
               exit 1
-            fi
+              ;;
+          esac
 
-            if [ ! -d "$DATA_ROOT/data" ]; then
-              mkdir -p "$DATA_ROOT/data"
-            fi
+          case "$ECS_DATA_ROOT" in
+            "/"|"/var"|"/var/"|"/var/www"|"/var/www/"|*..*|*"'"*)
+              echo "Unsafe ECS_DATA_ROOT: $ECS_DATA_ROOT"
+              exit 1
+              ;;
+          esac
 
-            if [ ! -d "$DATA_ROOT/uploads" ]; then
-              mkdir -p "$DATA_ROOT/uploads"
-            fi
+          if [ "$ECS_APP_DIR" = "$ECS_DATA_ROOT" ]; then
+            echo "ECS_APP_DIR and ECS_DATA_ROOT must be different"
+            exit 1
+          fi
 
-            npm ci
-            npm run build
+      - name: Install dependencies
+        run: npm ci
 
-            if pm2 describe archive > /dev/null 2>&1; then
-              pm2 restart archive --update-env
-            else
-              pm2 start npm --name archive -- run start
-            fi
+      - name: Build Nuxt artifact
+        run: npm run build:local
 
-            pm2 save
+      - name: Prepare deploy artifact
+        run: |
+          set -e
+          if [ -e deploy-artifact ]; then
+            echo "deploy-artifact already exists"
+            exit 1
+          fi
+          rm -f deploy-artifact.tar.gz
+          mkdir -p deploy-artifact
+          cp -R .output deploy-artifact/.output
+          cat > deploy-artifact/ecosystem.config.cjs <<'EOF'
+          const fs = require('fs');
+          const path = require('path');
+
+          /**
+           * 解析 dotenv 文件，避免通过 shell source 解释密钥内容。
+           * @param {string} filePath 环境变量文件路径。
+           * @returns {Record<string, string>} 解析后的环境变量。
+           */
+          function readDotEnv(filePath) {
+            if (!fs.existsSync(filePath)) return {};
+
+            return fs.readFileSync(filePath, 'utf8').split(/\r?\n/).reduce((env, line) => {
+              const trimmedLine = line.trim();
+              if (!trimmedLine || trimmedLine.startsWith('#')) return env;
+
+              const separatorIndex = trimmedLine.indexOf('=');
+              if (separatorIndex <= 0) return env;
+
+              const key = trimmedLine.slice(0, separatorIndex).trim();
+              let value = trimmedLine.slice(separatorIndex + 1).trim();
+              if (
+                (value.startsWith('"') && value.endsWith('"')) ||
+                (value.startsWith("'") && value.endsWith("'"))
+              ) {
+                value = value.slice(1, -1);
+              }
+
+              env[key] = value;
+              return env;
+            }, {});
+          }
+
+          const productionEnv = readDotEnv(path.resolve(__dirname, '.env.production'));
+
+          module.exports = {
+            apps: [
+              {
+                name: process.env.PM2_NAME || 'archive',
+                script: '.output/server/index.mjs',
+                cwd: __dirname,
+                exec_mode: 'fork',
+                instances: 1,
+                env: {
+                  ...productionEnv,
+                  NODE_ENV: 'production',
+                  PORT: process.env.APP_PORT || productionEnv.PORT || '3000',
+                  HOST: process.env.APP_HOST || productionEnv.HOST || '127.0.0.1'
+                }
+              }
+            ]
+          };
+          EOF
+          tar -czf deploy-artifact.tar.gz -C deploy-artifact .
+
+      - name: Setup SSH
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$ECS_SSH_KEY" > ~/.ssh/ecs_key
+          chmod 600 ~/.ssh/ecs_key
+          ssh-keyscan -p "$ECS_PORT" "$ECS_HOST" >> ~/.ssh/known_hosts
+
+      - name: Ensure remote directory and env
+        run: |
+          set -e
+          ssh -i ~/.ssh/ecs_key -p "$ECS_PORT" "$ECS_USER@$ECS_HOST" "\
+            mkdir -p '$ECS_APP_DIR' '$ECS_DATA_ROOT/data' '$ECS_DATA_ROOT/uploads' && \
+            test -f '$ECS_APP_DIR/.env.production'"
+
+      - name: Upload artifact to ECS
+        run: |
+          set -e
+          scp -i ~/.ssh/ecs_key -P "$ECS_PORT" \
+            deploy-artifact.tar.gz \
+            "$ECS_USER@$ECS_HOST:$ECS_APP_DIR/deploy-artifact.tar.gz"
+
+      - name: Activate app on ECS
+        run: |
+          set -e
+          ssh -i ~/.ssh/ecs_key -p "$ECS_PORT" "$ECS_USER@$ECS_HOST" "\
+            if ! command -v node >/dev/null 2>&1; then echo 'Node.js is required on ECS' && exit 1; fi && \
+            if ! command -v pm2 >/dev/null 2>&1; then npm install -g pm2; fi && \
+            tar -xzf '$ECS_APP_DIR/deploy-artifact.tar.gz' -C '$ECS_APP_DIR' && \
+            rm -f '$ECS_APP_DIR/deploy-artifact.tar.gz' && \
+            PM2_NAME='$PM2_NAME' APP_PORT='$APP_PORT' APP_HOST='$APP_HOST' pm2 startOrReload '$ECS_APP_DIR/ecosystem.config.cjs' --only '$PM2_NAME' --update-env && \
+            pm2 save"

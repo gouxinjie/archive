@@ -97,8 +97,8 @@ const writeSampleFile = (storagePath, content) => {
  * @throws 当写入失败时抛出错误
  */
 const seedProfiles = (database) => {
-  const personalPassword = process.env.NUXT_PERSONAL_ARCHIVE_PASSWORD || 'xinjie123';
-  const demoPassword = process.env.NUXT_DEMO_ARCHIVE_PASSWORD || '123456';
+  const personalPassword = process.env.NUXT_PERSONAL_ACCOUNT_PASSWORD || process.env.NUXT_PERSONAL_ARCHIVE_PASSWORD || 'xinjie123';
+  const demoPassword = process.env.NUXT_DEMO_ACCOUNT_PASSWORD || process.env.NUXT_DEMO_ARCHIVE_PASSWORD || '123456';
   const insertProfile = database.prepare(`
     INSERT INTO archive_profiles (id, name, password_hash, created_at, updated_at)
     VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -113,11 +113,11 @@ const seedProfiles = (database) => {
   insertProfile.run('personal', '个人档案', bcrypt.hashSync(personalPassword, 12));
   insertProfile.run('demo', '演示档案', bcrypt.hashSync(demoPassword, 12));
 
-  if (process.env.NUXT_PERSONAL_ARCHIVE_PASSWORD) {
+  if (process.env.NUXT_PERSONAL_ACCOUNT_PASSWORD || process.env.NUXT_PERSONAL_ARCHIVE_PASSWORD) {
     updateProfilePassword.run(bcrypt.hashSync(personalPassword, 12), 'personal');
   }
 
-  if (process.env.NUXT_DEMO_ARCHIVE_PASSWORD) {
+  if (process.env.NUXT_DEMO_ACCOUNT_PASSWORD || process.env.NUXT_DEMO_ARCHIVE_PASSWORD) {
     updateProfilePassword.run(bcrypt.hashSync(demoPassword, 12), 'demo');
   }
 };

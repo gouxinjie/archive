@@ -1,0 +1,64 @@
+name: Deploy to ECS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Archive
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Deploy by SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: ${{ secrets.ECS_USER }}
+          key: ${{ secrets.ECS_SSH_KEY }}
+          port: ${{ secrets.ECS_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -e
+
+            APP_DIR="${{ secrets.ECS_APP_DIR }}"
+            if [ -z "$APP_DIR" ]; then
+              APP_DIR="/var/www/archive"
+            fi
+
+            DATA_ROOT="${{ secrets.ECS_DATA_ROOT }}"
+            if [ -z "$DATA_ROOT" ]; then
+              DATA_ROOT="/var/www/archive-data"
+            fi
+
+            cd "$APP_DIR"
+
+            if [ ! -f ".env.production" ]; then
+              echo "缺少 .env.production，请先在 ECS 的 $APP_DIR 下创建生产环境变量文件。"
+              exit 1
+            fi
+
+            if [ ! -d "$DATA_ROOT/data" ]; then
+              mkdir -p "$DATA_ROOT/data"
+            fi
+
+            if [ ! -d "$DATA_ROOT/uploads" ]; then
+              mkdir -p "$DATA_ROOT/uploads"
+            fi
+
+            git fetch origin main
+            git reset --hard origin/main
+
+            npm ci
+            npm run build
+
+            if pm2 describe archive > /dev/null 2>&1; then
+              pm2 restart archive --update-env
+            else
+              pm2 start npm --name archive -- run start
+            fi
+
+            pm2 save

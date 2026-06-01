@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "nuxt dev",
-    "build": "nuxt build",
-    "preview": "nuxt preview",
+    "build": "node scripts/with-env.mjs .env.production nuxt build",
+    "build:local": "nuxt build",
+    "start": "node scripts/with-env.mjs .env.production node .output/server/index.mjs",
+    "preview": "node scripts/with-env.mjs .env.production nuxt preview",
     "typecheck": "nuxt typecheck",
     "lint": "eslint .",
     "db:seed": "node scripts/seed-dev-data.mjs",

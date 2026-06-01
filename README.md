@@ -72,7 +72,7 @@ http://localhost:3000
 
 ## 环境变量
 
-可以复制 `.env.example` 为 `.env`，然后按需要修改：
+本地开发可以复制 `.env.example` 为 `.env`，然后按需要修改：
 
 ```bash
 cp .env.example .env
@@ -81,22 +81,44 @@ cp .env.example .env
 常用配置：
 
 ```text
-NUXT_SESSION_SECRET=please-change-to-a-random-32-character-secret
-NUXT_FILE_PREVIEW_SECRET=please-change-file-preview-secret-32
+NODE_ENV=development
+HOST=127.0.0.1
+PORT=3000
+NUXT_PUBLIC_ORIGIN=http://localhost:3000
+NUXT_OWNER_USER_ID=owner
+NUXT_SESSION_SECRET=please-change-to-a-random-32-character-dev-secret
+NUXT_FILE_PREVIEW_SECRET=please-change-file-preview-dev-secret-32
 NUXT_DATABASE_PATH=./data/archive.db
 NUXT_UPLOADS_DIR=./uploads
-NUXT_PERSONAL_ACCOUNT_PASSWORD=please-change-personal-password
+NUXT_PERSONAL_ACCOUNT_PASSWORD=xinjie123
 NUXT_DEMO_ACCOUNT_PASSWORD=123456
 ```
 
 说明：
 
+- `NODE_ENV`：运行环境，本地开发使用 `development`，生产部署必须为 `production`。
+- `HOST` / `PORT`：Nuxt 服务监听地址和端口。
+- `NUXT_PUBLIC_ORIGIN`：生产访问地址，必须改为 ECS 域名或公网 HTTPS 地址。
+- `NUXT_OWNER_USER_ID`：单人系统请求标识，通常保持 `owner`。
 - `NUXT_SESSION_SECRET`：会话签名密钥，部署时必须替换为随机字符串。
 - `NUXT_FILE_PREVIEW_SECRET`：文件预览访问密钥，部署时必须替换。
 - `NUXT_DATABASE_PATH`：SQLite 数据库文件路径。
 - `NUXT_UPLOADS_DIR`：上传文件保存目录。
 - `NUXT_PERSONAL_ACCOUNT_PASSWORD`：个人账号默认密码。
 - `NUXT_DEMO_ACCOUNT_PASSWORD`：演示账号默认密码。
+
+ECS 生产部署可以复制 `.env.production.example` 为 `.env.production`：
+
+```bash
+cp .env.production.example .env.production
+```
+
+生产模板默认使用以下持久化目录：
+
+```text
+NUXT_DATABASE_PATH=/var/www/archive-data/data/archive.db
+NUXT_UPLOADS_DIR=/var/www/archive-data/uploads
+```
 
 ## 常用命令
 
@@ -116,7 +138,19 @@ npm run typecheck
 npm run build
 ```
 
-构建生产版本。
+加载 `.env.production` 并构建生产版本。
+
+```bash
+npm run build:local
+```
+
+不加载 `.env.production`，仅用于本地临时构建检查。
+
+```bash
+npm run start
+```
+
+加载 `.env.production` 并启动 `.output` 生产服务。
 
 ```bash
 npm run preview
@@ -170,18 +204,36 @@ npm run db:seed
 
 ## 部署提示
 
+ECS 推荐项目代码目录为：
+
+```text
+/var/www/archive
+```
+
 构建生产版本：
 
 ```bash
 npm run build
 ```
 
-构建完成后，Nuxt 会生成 `.output` 目录。部署时需要同时保留并配置好：
+`npm run build` 会自动读取 `.env.production`。如果 ECS 上没有该文件，命令会直接失败，避免误用默认配置构建生产包。
+
+构建完成后，Nuxt 会生成 `.output` 目录。部署时需要保留并配置好：
 
 - `.output`
-- `data` 或自定义数据库目录
-- `uploads` 或自定义上传目录
-- `.env` 中的生产密钥和密码
+- `.env.production` 中的生产密钥和密码
+- SQLite 数据库目录，ECS 推荐 `/var/www/archive-data/data`
+- 上传文件目录，ECS 推荐 `/var/www/archive-data/uploads`
+
+启动生产服务：
+
+```bash
+npm run start
+```
+
+`npm run start` 同样会自动读取 `.env.production`，确保运行时的 Cookie 密钥、数据库路径和上传目录与构建时一致。
+
+如果使用 GitHub Actions 自动部署到 ECS，参考 [ECS 使用 GitHub Actions 自动部署](./docs/ecs-github-actions-deploy.md)。
 
 生产环境至少需要修改：
 

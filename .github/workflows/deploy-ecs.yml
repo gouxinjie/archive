@@ -19,7 +19,7 @@ jobs:
           host: ${{ secrets.ECS_HOST }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
-          port: ${{ secrets.ECS_PORT || 22 }}
+          port: ${{ secrets.ECS_PORT || '22' }}
           script_stop: true
           script: |
             set -e
@@ -34,7 +34,22 @@ jobs:
               DATA_ROOT="/var/www/archive-data"
             fi
 
+            REPOSITORY_URL="https://github.com/${{ github.repository }}.git"
+
+            mkdir -p "$APP_DIR"
             cd "$APP_DIR"
+
+            if [ ! -d ".git" ]; then
+              git init
+              git remote add origin "$REPOSITORY_URL"
+            elif git remote get-url origin > /dev/null 2>&1; then
+              git remote set-url origin "$REPOSITORY_URL"
+            else
+              git remote add origin "$REPOSITORY_URL"
+            fi
+
+            git fetch --depth=1 origin main
+            git reset --hard origin/main
 
             if [ ! -f ".env.production" ]; then
               echo "缺少 .env.production，请先在 ECS 的 $APP_DIR 下创建生产环境变量文件。"
@@ -48,9 +63,6 @@ jobs:
             if [ ! -d "$DATA_ROOT/uploads" ]; then
               mkdir -p "$DATA_ROOT/uploads"
             fi
-
-            git fetch origin main
-            git reset --hard origin/main
 
             npm ci
             npm run build

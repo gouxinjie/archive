@@ -41,21 +41,22 @@ sudo mkdir -p /var/www/archive-data/uploads
 npm install -g pm2
 ```
 
-拉取项目：
+准备项目目录：
 
 ```bash
-cd /var/www
-git clone <你的仓库地址> archive
+sudo mkdir -p /var/www/archive
 cd /var/www/archive
 ```
+
+GitHub Actions 首次部署时会在该目录中自动初始化 Git 仓库并拉取 `main` 分支，不要求你提前手动 `git clone`。
 
 创建生产环境变量文件：
 
 ```bash
-cp .env.production.example .env.production
+vim /var/www/archive/.env.production
 ```
 
-然后编辑 `.env.production`，至少修改：
+首次部署前 `/var/www/archive` 里可能还没有项目代码，所以不能依赖 `cp .env.production.example .env.production`。直接在 ECS 上创建 `/var/www/archive/.env.production`，内容可以参考仓库里的 `.env.production.example`。至少需要配置：
 
 ```text
 NUXT_PUBLIC_ORIGIN
@@ -132,10 +133,10 @@ ECS_DATA_ROOT # 持久化数据根目录，默认 /var/www/archive-data
 ```text
 SSH 登录 ECS
   -> 进入 /var/www/archive
+  -> 初始化或更新 Git 仓库
+  -> 拉取 main 分支代码
   -> 检查 .env.production
   -> 创建 /var/www/archive-data/data 和 /var/www/archive-data/uploads
-  -> git fetch origin main
-  -> git reset --hard origin/main
   -> npm ci
   -> npm run build
   -> pm2 restart archive --update-env

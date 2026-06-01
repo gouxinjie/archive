@@ -65,6 +65,36 @@ export interface FilePreviewTokenPayload extends FilePreviewTokenInput {
 const isProduction = (): boolean => process.env.NODE_ENV === 'production';
 
 /**
+ * 判断当前请求是否应该使用 Secure Cookie
+ * @param event - H3 请求事件
+ * @returns 是否使用 Secure Cookie
+ * @throws 不主动抛出异常
+ */
+const shouldUseSecureCookie = (event: H3Event): boolean => {
+  if (!isProduction()) {
+    return false;
+  }
+
+  const forwardedProto = getHeader(event, 'x-forwarded-proto');
+
+  if (typeof forwardedProto === 'string' && forwardedProto.length > 0) {
+    return forwardedProto.split(',')[0]?.trim().toLowerCase() === 'https';
+  }
+
+  const configuredOrigin = process.env.NUXT_PUBLIC_ORIGIN?.trim();
+
+  if (!configuredOrigin) {
+    return false;
+  }
+
+  try {
+    return new URL(configuredOrigin).protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
+/**
  * 获取会话签名密钥
  * @returns 会话签名密钥
  * @throws 当生产环境未配置 NUXT_SESSION_SECRET 时抛出异常
@@ -392,7 +422,7 @@ export const setSessionCookie = (event: H3Event, profile: ArchiveSession): void 
     maxAge: SESSION_TTL_SECONDS,
     path: '/',
     sameSite: 'strict',
-    secure: isProduction()
+    secure: shouldUseSecureCookie(event)
   });
 };
 
@@ -408,7 +438,7 @@ export const clearSessionCookie = (event: H3Event): void => {
     maxAge: 0,
     path: '/',
     sameSite: 'strict',
-    secure: isProduction()
+    secure: shouldUseSecureCookie(event)
   });
 };
 
@@ -492,7 +522,7 @@ export const ensureCsrfCookie = (event: H3Event): string => {
     maxAge: SESSION_TTL_SECONDS,
     path: '/',
     sameSite: 'strict',
-    secure: isProduction()
+    secure: shouldUseSecureCookie(event)
   });
 
   return token;

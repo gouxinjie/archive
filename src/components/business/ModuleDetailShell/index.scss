@@ -1344,7 +1344,9 @@
     display: grid;
     gap: $space-3;
     justify-items: center;
+    max-height: calc(100vh - 232px);
     min-width: 0;
+    width: 100%;
   }
 
   &__image-preview-media {
@@ -1352,7 +1354,7 @@
     border: 1px solid $color-border-soft;
     border-radius: $radius-sm;
     display: block;
-    max-height: min(58vh, 560px);
+    max-height: calc(100vh - 320px);
     max-width: 100%;
     object-fit: contain;
   }
@@ -1741,6 +1743,22 @@
 :deep(.module-detail__document-dialog) {
   .el-dialog__body {
     max-height: min(72vh, 760px);
+  }
+}
+
+:deep(.module-detail__image-preview-dialog) {
+  .el-dialog {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 24px);
+  }
+
+  .el-dialog__body {
+    display: flex;
+    flex: 1 1 auto;
+    max-height: none;
+    overflow: hidden;
+    padding-bottom: $space-4;
   }
 }
 

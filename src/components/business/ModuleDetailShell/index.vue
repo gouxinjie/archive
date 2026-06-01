@@ -956,6 +956,20 @@ const buildStoredFileUrl = (item: FileAssetListItem, download = false): string =
 };
 
 /**
+ * 生成文档下载地址
+ * @param id - 文档记录标识
+ * @returns 带 userId 的文档下载接口地址
+ * @throws 不抛出异常
+ */
+const buildDocumentDownloadUrl = (id: string): string => {
+  const query = new URLSearchParams({
+    userId: getArchiveUserId()
+  });
+
+  return `/api/documents/${encodeURIComponent(id)}/download?${query.toString()}`;
+};
+
+/**
  * 生成图片读取地址
  * @param item - 图片文件记录
  * @param download - 是否下载
@@ -981,6 +995,32 @@ const triggerFileDownload = (url: string, fileName: string): void => {
   window.document.body.appendChild(link);
   link.click();
   link.remove();
+};
+
+/**
+ * 下载文档文件
+ * @param item - 文档记录
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const downloadDocument = (item: DocumentListItem): void => {
+  triggerFileDownload(buildDocumentDownloadUrl(item.id), item.originalName);
+};
+
+/**
+ * 下载当前查看中的文档文件
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const downloadCurrentDocument = (): void => {
+  if (!documentForm.value.id) {
+    return;
+  }
+
+  const fileName = documentForm.value.originalName.trim()
+    || normalizeDocumentFileName(documentForm.value.title, documentForm.value.fileType);
+
+  triggerFileDownload(buildDocumentDownloadUrl(documentForm.value.id), fileName);
 };
 
 const handleSearch = (): void => {
@@ -2486,6 +2526,7 @@ watch(
 
                       <span class="module-detail__document-actions">
                         <el-button class="module-detail__document-action" text @click="openViewDocumentDialog(item)">查看</el-button>
+                        <el-button class="module-detail__document-action" text @click="downloadDocument(item)">下载</el-button>
                         <el-button class="module-detail__document-action" type="primary" text @click="openEditDocumentDialog(item)">编辑</el-button>
                       </span>
                     </article>
@@ -3035,6 +3076,14 @@ watch(
 
       <template #footer>
         <div class="module-detail__drawer-actions">
+          <el-button
+            v-if="isDocumentDialogReadonly && documentForm.id"
+            text
+            @click="downloadCurrentDocument"
+          >
+            <el-icon><Download /></el-icon>
+            下载
+          </el-button>
           <el-button
             v-if="isDocumentDialogReadonly && documentForm.id"
             type="danger"

@@ -27,7 +27,7 @@ sudo mkdir -p /var/www/archive-data/uploads
 
 ## ECS 首次准备
 
-安装 Node.js、Git、tar、npm 和 PM2。Node.js 版本建议与 GitHub Actions 中一致，当前工作流使用 Node.js 22。
+安装 Node.js、Git、tar、npm 和 PM2。Node.js 版本必须与 GitHub Actions 构建环境保持同一大版本，当前工作流使用 Node.js 20。
 
 ```bash
 npm install -g pm2
@@ -113,7 +113,6 @@ GitHub Actions
 ECS
   -> 解压覆盖到 /var/www/archive
   -> 删除临时压缩包 deploy-artifact.tar.gz
-  -> 在 ECS 上执行 npm rebuild better-sqlite3
   -> PM2 startOrReload /var/www/archive/ecosystem.config.cjs
 ```
 
@@ -159,7 +158,7 @@ server {
 
 直接覆盖部署更简单，但没有 release 目录回滚能力。如果新版本异常，需要重新运行上一次稳定提交的 workflow。
 
-项目使用了 `better-sqlite3`，它是原生模块。即使产物在 GitHub Actions 上构建完成，部署到 ECS 后仍需要按 ECS 当前 Node 版本执行一次 `npm rebuild better-sqlite3`。当前工作流已经自动执行这一步。
+项目使用了 `better-sqlite3`，它是原生模块。GitHub Actions 构建产物所用的 Node.js 大版本必须与 ECS 运行时一致，否则会出现原生模块加载失败。当前工作流固定使用 Node.js 20，并会在部署时校验 ECS 也是 20.x。
 
 备份时至少备份：
 

@@ -1102,7 +1102,7 @@
     border-bottom: 1px solid $color-border-soft;
     display: grid;
     gap: $space-4;
-    grid-template-columns: 148px minmax(0, 1fr) minmax(280px, auto);
+    grid-template-columns: 112px minmax(0, 1fr) minmax(280px, auto) minmax(192px, auto);
     min-height: 58px;
     padding: 0 $space-4;
     transition: background 160ms ease;
@@ -1164,6 +1164,46 @@
     grid-template-columns: 108px 72px 132px;
     justify-content: end;
     text-align: right;
+  }
+
+  &__file-actions {
+    align-items: center;
+    display: flex;
+    gap: $space-1;
+    justify-content: flex-end;
+    min-width: 0;
+  }
+
+  &__file-action {
+    font-size: 12px;
+    min-height: 28px;
+    padding: 0 $space-1;
+  }
+
+  &__file-upload-row {
+    align-items: center;
+    appearance: none;
+    background: #f8fbff;
+    border: 0;
+    color: $color-primary;
+    cursor: pointer;
+    display: flex;
+    font-family: $font-family-base;
+    font-size: 13px;
+    font-weight: 800;
+    gap: $space-1;
+    justify-content: center;
+    min-height: 52px;
+    padding: 0 $space-4;
+    text-align: center;
+
+    &:hover {
+      background: #eef6ff;
+    }
+
+    &:focus-visible {
+      @include focus-ring;
+    }
   }
 
   &__drawer-head {
@@ -1242,7 +1282,8 @@
 
   &__document-upload,
   &__resume-upload,
-  &__image-upload {
+  &__image-upload,
+  &__file-upload {
     :deep(.el-form-item__content) {
       display: grid;
       gap: $space-2;
@@ -1263,7 +1304,8 @@
 
   &__document-upload-tip,
   &__resume-upload-tip,
-  &__image-upload-tip {
+  &__image-upload-tip,
+  &__file-upload-tip {
     color: $color-text-soft;
     font-size: 12px;
     line-height: 1.5;
@@ -1271,7 +1313,8 @@
   }
 
   &__resume-selected,
-  &__image-selected {
+  &__image-selected,
+  &__file-selected {
     align-items: center;
     background: #f8fbff;
     border: 1px solid $color-border-soft;
@@ -1283,14 +1326,16 @@
   }
 
   &__resume-selected-name,
-  &__image-selected-name {
+  &__image-selected-name,
+  &__file-selected-name {
     @include text-ellipsis;
     color: $color-text-main;
     font-size: 13px;
   }
 
   &__resume-selected-empty,
-  &__image-selected-empty {
+  &__image-selected-empty,
+  &__file-selected-empty {
     color: $color-text-soft;
     font-size: 13px;
   }
@@ -1839,6 +1884,11 @@
       justify-content: start;
       text-align: left;
     }
+
+    &__file-actions {
+      grid-column: 2;
+      justify-content: flex-start;
+    }
   }
 }
 
@@ -1929,6 +1979,11 @@
       grid-column: auto;
       justify-content: start;
       text-align: left;
+    }
+
+    &__file-actions {
+      grid-column: auto;
+      justify-content: flex-start;
     }
 
     &__drawer-form {

@@ -4,9 +4,13 @@
 
 export const DOCUMENT_CATEGORY_OPTIONS = ['工作记录', '项目说明', '备忘', '模板'] as const;
 
+export const CERTIFICATE_CATEGORY_OPTIONS = ['身份证明', '学历证书', '职业资格', '入职材料', '合同票据', '其他'] as const;
+
 export const STUDY_CATEGORY_OPTIONS = ['前端', '后端', '数据库', 'AI相关'] as const;
 
 export type DocumentCategory = (typeof DOCUMENT_CATEGORY_OPTIONS)[number];
+
+export type CertificateCategory = (typeof CERTIFICATE_CATEGORY_OPTIONS)[number];
 
 export type StudyCategory = (typeof STUDY_CATEGORY_OPTIONS)[number];
 
@@ -22,6 +26,14 @@ const documentCategoryAliasRules: readonly CategoryAliasRule<DocumentCategory>[]
   { target: '项目说明', aliases: ['项目', '说明', '部署', '技术', '接口', '数据库', '开发'] },
   { target: '备忘', aliases: ['备忘', '便签', '待办', '其他', '生活'] },
   { target: '模板', aliases: ['模板', '范本', '格式'] }
+];
+
+const certificateCategoryAliasRules: readonly CategoryAliasRule<CertificateCategory>[] = [
+  { target: '身份证明', aliases: ['身份证', '护照', '户口', '驾驶证', '居住证', '社保卡', '证明'] },
+  { target: '学历证书', aliases: ['学历', '学位', '毕业', '成绩', '四六级', '英语'] },
+  { target: '职业资格', aliases: ['资格', '证书', '职称', '执业', '认证', '培训'] },
+  { target: '入职材料', aliases: ['入职', '离职', '背调', '体检', '劳动', '员工'] },
+  { target: '合同票据', aliases: ['合同', '发票', '收据', '票据', '报销'] }
 ];
 
 const studyCategoryAliasRules: readonly CategoryAliasRule<StudyCategory>[] = [
@@ -83,6 +95,16 @@ const normalizeCategory = <TCategory extends string>(
  */
 export const normalizeDocumentCategory = (category: string | null | undefined): DocumentCategory => {
   return normalizeCategory(category, DOCUMENT_CATEGORY_OPTIONS, documentCategoryAliasRules, '备忘');
+};
+
+/**
+ * 归一化证件分类
+ * @param category - 原始证件分类
+ * @returns 证件分类
+ * @throws 不抛出异常
+ */
+export const normalizeCertificateCategory = (category: string | null | undefined): CertificateCategory => {
+  return normalizeCategory(category, CERTIFICATE_CATEGORY_OPTIONS, certificateCategoryAliasRules, '其他');
 };
 
 /**

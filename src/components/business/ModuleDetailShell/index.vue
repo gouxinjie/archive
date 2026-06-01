@@ -42,8 +42,10 @@ import AppInput from '~/components/commons/AppInput/index.vue';
 import FileDropzone from '~/components/commons/FileDropzone/index.vue';
 import { APP_ENGLISH_NAME, APP_NAME, ARCHIVE_MODULES } from '~/constants/app';
 import {
+  CERTIFICATE_CATEGORY_OPTIONS,
   DOCUMENT_CATEGORY_OPTIONS,
   STUDY_CATEGORY_OPTIONS,
+  normalizeCertificateCategory,
   normalizeDocumentCategory,
   normalizeStudyCategory
 } from '~/constants/archiveCategories';
@@ -56,6 +58,7 @@ import type {
   DocumentFileType,
   DocumentFormPayload,
   DocumentListItem,
+  FileAssetFormPayload,
   FileAssetListItem,
   ImageFormPayload,
   PasswordFormPayload,
@@ -112,6 +115,14 @@ interface ModuleDetailShellProps {
   imageSuccessVersion?: number;
   /** 类型：数字；含义：图片删除成功信号；是否必填：否；默认值：0 */
   imageDeleteSuccessVersion?: number;
+  /** 类型：布尔值；含义：证件和学习资料文件操作是否执行中；是否必填：否；默认值：false */
+  fileOperationLoading?: boolean;
+  /** 类型：字符串；含义：证件和学习资料文件弹窗内操作错误提示；是否必填：否；默认值：空字符串 */
+  fileOperationError?: string;
+  /** 类型：数字；含义：证件和学习资料文件保存成功信号；是否必填：否；默认值：0 */
+  fileSuccessVersion?: number;
+  /** 类型：数字；含义：证件和学习资料文件删除成功信号；是否必填：否；默认值：0 */
+  fileDeleteSuccessVersion?: number;
 }
 
 interface CategoryGroup<T> {
@@ -129,6 +140,7 @@ interface LoginMethodOptionGroup {
 }
 
 type DocumentEditorMode = 'write' | 'preview';
+type PreviewImageSource = 'images' | 'files';
 
 interface ResumeFormState {
   /** 类型：字符串或 undefined；含义：简历记录唯一标识；是否必填：编辑时必填；默认值：undefined */
@@ -156,6 +168,19 @@ interface ImageFormState {
   remark: string;
 }
 
+interface GenericFileFormState {
+  /** 类型：字符串或 undefined；含义：文件记录唯一标识；是否必填：编辑时必填；默认值：undefined */
+  id?: string;
+  /** 类型：字符串；含义：文件标题；是否必填：是；默认值：空字符串 */
+  title: string;
+  /** 类型：字符串；含义：文件分类；是否必填：是；默认值：其他 */
+  category: string;
+  /** 类型：字符串；含义：当前文件原始名称；是否必填：否；默认值：空字符串 */
+  originalName: string;
+  /** 类型：字符串；含义：备注；是否必填：否；默认值：空字符串 */
+  remark: string;
+}
+
 const props = withDefaults(defineProps<ModuleDetailShellProps>(), {
   errorMessage: '',
   userName: '',
@@ -174,12 +199,15 @@ const props = withDefaults(defineProps<ModuleDetailShellProps>(), {
   imageOperationLoading: false,
   imageOperationError: '',
   imageSuccessVersion: 0,
-  imageDeleteSuccessVersion: 0
+  imageDeleteSuccessVersion: 0,
+  fileOperationLoading: false,
+  fileOperationError: '',
+  fileSuccessVersion: 0,
+  fileDeleteSuccessVersion: 0
 });
 
 const allCategoryLabel = '全部';
 const imageModuleCategoryOptions = ['证件照', '自拍照', '生活照', '旅行照', '工作照', '截图', '其他'] as const;
-const certificateModuleCategoryOptions = ['身份证明', '学历证书', '职业资格', '入职材料', '合同票据', '其他'] as const;
 
 interface CategoryAliasRule {
   /** 类型：字符串；含义：归一化后的分类名称；是否必填：是；默认值：无 */
@@ -197,14 +225,6 @@ const imageCategoryAliasRules: readonly CategoryAliasRule[] = [
   { target: '截图', aliases: ['截图', '截屏', '屏幕'] }
 ];
 
-const certificateCategoryAliasRules: readonly CategoryAliasRule[] = [
-  { target: '身份证明', aliases: ['身份证', '护照', '户口', '驾驶证', '居住证', '社保卡', '证明'] },
-  { target: '学历证书', aliases: ['学历', '学位', '毕业', '成绩', '四六级', '英语'] },
-  { target: '职业资格', aliases: ['资格', '证书', '职称', '执业', '认证', '培训'] },
-  { target: '入职材料', aliases: ['入职', '离职', '背调', '体检', '劳动', '员工'] },
-  { target: '合同票据', aliases: ['合同', '发票', '收据', '票据', '报销'] }
-];
-
 const emit = defineEmits<{
   lock: [];
   backHome: [];
@@ -218,6 +238,8 @@ const emit = defineEmits<{
   deleteResume: [id: string];
   saveImage: [payload: ImageFormPayload];
   deleteImage: [id: string];
+  saveFile: [payload: FileAssetFormPayload];
+  deleteFile: [payload: { module: ArchiveModuleKey; id: string }];
 }>();
 
 const keyword = ref('');
@@ -320,6 +342,7 @@ const imageSubmitAttempted = ref(false);
 const imageFormRef = ref<FormInstance>();
 const selectedImageFile = ref<File | null>(null);
 const previewImageItem = ref<FileAssetListItem | null>(null);
+const previewImageSource = ref<PreviewImageSource>('images');
 const imageForm = ref<ImageFormState>({
   title: '',
   category: '证件照',
@@ -331,6 +354,44 @@ const imageUploadAccept = '.jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image
 const maxImageUploadBytes = 15 * 1024 * 1024;
 const imageFormRules: FormRules<ImageFormState> = {
   title: [{ required: true, message: '请输入图片标题', trigger: 'blur' }],
+  category: [{ required: true, message: '请选择或输入分类', trigger: 'change' }]
+};
+const fileDialogVisible = ref(false);
+const fileDialogMode = ref<'create' | 'edit'>('create');
+const fileFormError = ref('');
+const fileSubmitAttempted = ref(false);
+const fileFormRef = ref<FormInstance>();
+const selectedGenericFile = ref<File | null>(null);
+const fileForm = ref<GenericFileFormState>({
+  title: '',
+  category: '其他',
+  originalName: '',
+  remark: ''
+});
+const genericFileUploadAccept = [
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
+  '.gif',
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.md',
+  '.txt',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/markdown',
+  'text/plain'
+].join(',');
+const maxGenericFileUploadBytes = 25 * 1024 * 1024;
+const fileFormRules: FormRules<GenericFileFormState> = {
+  title: [{ required: true, message: '请输入文件标题', trigger: 'blur' }],
   category: [{ required: true, message: '请选择或输入分类', trigger: 'change' }]
 };
 
@@ -349,6 +410,7 @@ const isResumeModule = computed<boolean>(() => props.module.key === 'resumes');
 const isImageModule = computed<boolean>(() => props.module.key === 'images');
 const isCertificateModule = computed<boolean>(() => props.module.key === 'certificates');
 const isStudyModule = computed<boolean>(() => props.module.key === 'study');
+const isEditableFileModule = computed<boolean>(() => isCertificateModule.value || isStudyModule.value);
 const isPasswordDialogReadonly = computed<boolean>(() => passwordDialogMode.value === 'view');
 const isDocumentDialogReadonly = computed<boolean>(() => documentDialogMode.value === 'view');
 const passwordDialogTitle = computed<string>(() => {
@@ -406,6 +468,31 @@ const imageDialogErrorMessage = computed<string>(() => {
   }
 
   return imageSubmitAttempted.value ? props.imageOperationError : '';
+});
+const fileDialogTitle = computed<string>(() => {
+  const moduleName = isStudyModule.value ? '资料' : '证件';
+  return fileDialogMode.value === 'create' ? `上传${moduleName}` : `编辑${moduleName}`;
+});
+const fileDialogErrorMessage = computed<string>(() => {
+  if (fileFormError.value) {
+    return fileFormError.value;
+  }
+
+  return fileSubmitAttempted.value ? props.fileOperationError : '';
+});
+const fileCategoryOptions = computed<string[]>(() => {
+  if (isStudyModule.value) {
+    return [...STUDY_CATEGORY_OPTIONS];
+  }
+
+  return [...CERTIFICATE_CATEGORY_OPTIONS];
+});
+const defaultFileCategory = computed<string>(() => {
+  if (activeCategory.value !== allCategoryLabel) {
+    return activeCategory.value;
+  }
+
+  return isStudyModule.value ? '前端' : '其他';
 });
 
 const userAvatarText = computed<string>(() => {
@@ -545,16 +632,6 @@ const normalizeImageCategory = (category: string | null | undefined): string => 
   return normalizeCategoryByRules(category, imageModuleCategoryOptions, imageCategoryAliasRules);
 };
 
-/**
- * 获取证件模块展示分类
- * @param category - 证件原始分类
- * @returns 证件模块归一化分类
- * @throws 不抛出异常
- */
-const normalizeCertificateCategory = (category: string | null | undefined): string => {
-  return normalizeCategoryByRules(category, certificateModuleCategoryOptions, certificateCategoryAliasRules);
-};
-
 const passwordGroups = computed<CategoryGroup<PasswordListItem>[]>(() => {
   return createCategoryGroups(passwordItems.value, (item) => item.category);
 });
@@ -581,7 +658,7 @@ const fileGroups = computed<CategoryGroup<FileAssetListItem>[]>(() => {
   if (isCertificateModule.value) {
     return sortGroupsByCategoryOptions(
       createCategoryGroups(fileItems.value, (item) => normalizeCertificateCategory(item.category)),
-      certificateModuleCategoryOptions
+      CERTIFICATE_CATEGORY_OPTIONS
     );
   }
 
@@ -628,7 +705,7 @@ const categoryTabs = computed<string[]>(() => {
     }
 
     if (isCertificateModule.value) {
-      return [...certificateModuleCategoryOptions];
+      return [...CERTIFICATE_CATEGORY_OPTIONS];
     }
 
     if (isStudyModule.value) {
@@ -856,13 +933,13 @@ const isImagePreviewable = (item: FileAssetListItem): boolean => {
 };
 
 /**
- * 生成图片读取地址
- * @param item - 图片文件记录
+ * 生成文件读取地址
+ * @param item - 文件记录
  * @param download - 是否下载
- * @returns 带 userId 的图片接口地址
+ * @returns 带 userId 的文件接口地址
  * @throws 不抛出异常
  */
-const buildImageFileUrl = (item: FileAssetListItem, download = false): string => {
+const buildStoredFileUrl = (item: FileAssetListItem, download = false): string => {
   const query = new URLSearchParams({
     userId: getArchiveUserId()
   });
@@ -871,7 +948,39 @@ const buildImageFileUrl = (item: FileAssetListItem, download = false): string =>
     query.set('download', '1');
   }
 
-  return `/api/images/${encodeURIComponent(item.id)}?${query.toString()}`;
+  if (item.module === 'images') {
+    return `/api/images/${encodeURIComponent(item.id)}?${query.toString()}`;
+  }
+
+  return `/api/files/${encodeURIComponent(item.module)}/${encodeURIComponent(item.id)}?${query.toString()}`;
+};
+
+/**
+ * 生成图片读取地址
+ * @param item - 图片文件记录
+ * @param download - 是否下载
+ * @returns 带 userId 的图片接口地址
+ * @throws 不抛出异常
+ */
+const buildImageFileUrl = (item: FileAssetListItem, download = false): string => {
+  return buildStoredFileUrl(item, download);
+};
+
+/**
+ * 触发浏览器下载文件
+ * @param url - 文件下载地址
+ * @param fileName - 下载文件名
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const triggerFileDownload = (url: string, fileName: string): void => {
+  const link = window.document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.rel = 'noreferrer';
+  window.document.body.appendChild(link);
+  link.click();
+  link.remove();
 };
 
 const handleSearch = (): void => {
@@ -1583,7 +1692,8 @@ const handleImageFilesSelected = (files: File[]): void => {
  * @throws 不抛出异常
  */
 const openCreateImageDialog = (category?: string): void => {
-  const defaultCategory = category || (activeCategory.value !== allCategoryLabel ? activeCategory.value : '证件照');
+  const targetCategory = typeof category === 'string' ? category : '';
+  const defaultCategory = targetCategory || (activeCategory.value !== allCategoryLabel ? activeCategory.value : '证件照');
 
   imageDialogMode.value = 'create';
   imageFormError.value = '';
@@ -1664,12 +1774,14 @@ const openImagePreviewDialog = (item: FileAssetListItem): void => {
   }
 
   previewImageItem.value = item;
+  previewImageSource.value = 'images';
   imagePreviewDialogVisible.value = true;
 };
 
 const closeImagePreviewDialog = (): void => {
   imagePreviewDialogVisible.value = false;
   previewImageItem.value = null;
+  previewImageSource.value = 'images';
 };
 
 /**
@@ -1684,13 +1796,7 @@ const downloadImage = (item: FileAssetListItem): void => {
     return;
   }
 
-  const link = window.document.createElement('a');
-  link.href = buildImageFileUrl(item, true);
-  link.download = item.originalName;
-  link.rel = 'noreferrer';
-  window.document.body.appendChild(link);
-  link.click();
-  link.remove();
+  triggerFileDownload(buildImageFileUrl(item, true), item.originalName);
 };
 
 /**
@@ -1747,6 +1853,278 @@ const confirmDeleteCurrentImage = async (): Promise<void> => {
   }
 };
 
+/**
+ * 判断本地文件是否为支持的证件或学习资料文件
+ * @param file - 用户选择的本地文件
+ * @returns 是否支持上传
+ * @throws 不抛出异常
+ */
+const isSupportedGenericFile = (file: File): boolean => {
+  const fileName = file.name.toLowerCase();
+  const supportedByName = /\.(jpe?g|png|webp|gif|pdf|docx?|md|txt)$/.test(fileName);
+  const supportedByMime = [
+    'image/gif',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/markdown',
+    'text/plain'
+  ].includes(file.type);
+
+  return supportedByName || supportedByMime;
+};
+
+/**
+ * 根据上传文件名生成通用文件标题
+ * @param fileName - 原始文件名
+ * @returns 去除扩展名后的文件标题
+ * @throws 不抛出异常
+ */
+const normalizeUploadedGenericFileTitle = (fileName: string): string => {
+  const title = fileName.replace(/\.[^.]+$/i, '').replace(/[-_]+/g, ' ').trim();
+  return title || '未命名文件';
+};
+
+/**
+ * 读取上传文件并填充证件或学习资料表单
+ * @param file - 用户选择的本地文件
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const applyUploadedGenericFile = (file: File): void => {
+  if (!isSupportedGenericFile(file)) {
+    fileFormError.value = '仅支持上传图片、PDF、Word、Markdown 或 TXT 文件';
+    return;
+  }
+
+  if (file.size > maxGenericFileUploadBytes) {
+    fileFormError.value = '文件不能超过 25MB';
+    return;
+  }
+
+  selectedGenericFile.value = file;
+  fileForm.value = {
+    ...fileForm.value,
+    title: fileForm.value.title.trim() || normalizeUploadedGenericFileTitle(file.name),
+    originalName: file.name
+  };
+  fileFormError.value = '';
+  fileFormRef.value?.clearValidate();
+  ElMessage.success('文件已选择，确认信息后保存');
+};
+
+/**
+ * 处理证件或学习资料文件选择
+ * @param files - 上传组件返回的文件列表
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const handleGenericFilesSelected = (files: File[]): void => {
+  const firstFile = files[0];
+
+  if (!firstFile) {
+    return;
+  }
+
+  applyUploadedGenericFile(firstFile);
+};
+
+/**
+ * 打开证件或学习资料上传弹窗
+ * @param category - 默认分类
+ * @returns 无返回值
+ * @throws 不抛出异常
+ */
+const openCreateFileDialog = (category?: string): void => {
+  const targetCategory = typeof category === 'string' ? category : '';
+
+  fileDialogMode.value = 'create';
+  fileFormError.value = '';
+  fileSubmitAttempted.value = false;
+  selectedGenericFile.value = null;
+  fileForm.value = {
+    title: '',
+    category: targetCategory || defaultFileCategory.value,
+    originalName: '',
+    remark: ''
+  };
+  fileDialogVisible.value = true;
+};
+
+/**
+ * 打开证件或学习资料编辑弹窗
+ * @param item - 文件记录
+ * @returns 无返回值
+ * @throws 不抛出异常
+ */
+const openEditFileDialog = (item: FileAssetListItem): void => {
+  fileDialogMode.value = 'edit';
+  fileFormError.value = '';
+  fileSubmitAttempted.value = false;
+  selectedGenericFile.value = null;
+  fileForm.value = {
+    id: item.id,
+    title: item.title,
+    category: isStudyModule.value ? normalizeStudyCategory(item.category) : normalizeCertificateCategory(item.category),
+    originalName: item.originalName,
+    remark: item.remark || ''
+  };
+  fileDialogVisible.value = true;
+};
+
+/**
+ * 关闭证件或学习资料文件弹窗
+ * @returns 无返回值
+ * @throws 不抛出异常
+ */
+const closeFileDialog = (): void => {
+  fileDialogVisible.value = false;
+  fileSubmitAttempted.value = false;
+  selectedGenericFile.value = null;
+};
+
+/**
+ * 提交证件或学习资料文件表单
+ * @returns 无返回值
+ * @throws 表单校验异常由 Element Plus 处理
+ */
+const submitFileForm = async (): Promise<void> => {
+  if (props.fileOperationLoading || !isEditableFileModule.value) {
+    return;
+  }
+
+  if (!fileFormRef.value) {
+    return;
+  }
+
+  const valid = await fileFormRef.value.validate();
+
+  if (!valid) {
+    return;
+  }
+
+  if (fileDialogMode.value === 'create' && !selectedGenericFile.value) {
+    fileFormError.value = '请先选择需要上传的文件';
+    return;
+  }
+
+  fileFormError.value = '';
+  fileSubmitAttempted.value = true;
+  emit('saveFile', {
+    module: props.module.key,
+    id: fileForm.value.id,
+    title: fileForm.value.title,
+    category: fileForm.value.category,
+    file: selectedGenericFile.value || undefined,
+    remark: fileForm.value.remark
+  });
+};
+
+/**
+ * 下载证件或学习资料文件
+ * @param item - 文件记录
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const downloadFile = (item: FileAssetListItem): void => {
+  triggerFileDownload(buildStoredFileUrl(item, true), item.originalName);
+};
+
+/**
+ * 预览证件或学习资料图片
+ * @param item - 文件记录
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const openGenericImagePreviewDialog = (item: FileAssetListItem): void => {
+  if (!isImagePreviewable(item)) {
+    downloadFile(item);
+    return;
+  }
+
+  previewImageItem.value = item;
+  previewImageSource.value = 'files';
+  imagePreviewDialogVisible.value = true;
+};
+
+/**
+ * 按预览来源打开正确的编辑弹窗
+ * @param item - 正在预览的图片文件
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const openEditPreviewImageDialog = (item: FileAssetListItem): void => {
+  if (previewImageSource.value === 'files') {
+    closeImagePreviewDialog();
+    openEditFileDialog(item);
+    return;
+  }
+
+  openEditImageDialog(item);
+};
+
+/**
+ * 弹窗确认删除证件或学习资料文件
+ * @param item - 文件记录
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const confirmDeleteFile = async (item: FileAssetListItem): Promise<void> => {
+  if (props.fileOperationLoading) {
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm('删除后会移除这条记录和文件，确认删除吗？', '删除文件', {
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      confirmButtonText: '删除',
+      confirmButtonClass: 'el-button--danger',
+      lockScroll: false,
+      modal: false,
+      type: 'warning'
+    });
+    emit('deleteFile', { module: item.module, id: item.id });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
+  }
+};
+
+/**
+ * 弹窗确认删除当前编辑的证件或学习资料文件
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const confirmDeleteCurrentFile = async (): Promise<void> => {
+  const fileId = fileForm.value.id;
+
+  if (!fileId || props.fileOperationLoading || !isEditableFileModule.value) {
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm('删除后会移除这条记录和文件，确认删除吗？', '删除文件', {
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      confirmButtonText: '删除',
+      confirmButtonClass: 'el-button--danger',
+      lockScroll: false,
+      modal: false,
+      type: 'warning'
+    });
+    emit('deleteFile', { module: props.module.key, id: fileId });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
+  }
+};
+
 watch(
   () => props.module.key,
   () => {
@@ -1756,6 +2134,7 @@ watch(
     documentDialogVisible.value = false;
     resumeDialogVisible.value = false;
     imageDialogVisible.value = false;
+    fileDialogVisible.value = false;
     imagePreviewDialogVisible.value = false;
   }
 );
@@ -1849,6 +2228,28 @@ watch(
     }
 
     if (imagePreviewDialogVisible.value) {
+      closeImagePreviewDialog();
+    }
+  }
+);
+
+watch(
+  () => props.fileSuccessVersion,
+  () => {
+    if (fileDialogVisible.value) {
+      closeFileDialog();
+    }
+  }
+);
+
+watch(
+  () => props.fileDeleteSuccessVersion,
+  () => {
+    if (fileDialogVisible.value) {
+      closeFileDialog();
+    }
+
+    if (imagePreviewDialogVisible.value && previewImageItem.value && isEditableFileModule.value) {
       closeImagePreviewDialog();
     }
   }
@@ -1988,10 +2389,18 @@ watch(
             <AppButton
               v-if="isImageModule"
               variant="secondary"
-              @click="openCreateImageDialog"
+              @click="openCreateImageDialog()"
             >
               <el-icon class="module-detail__button-icon"><Plus /></el-icon>
               上传图片
+            </AppButton>
+            <AppButton
+              v-if="isEditableFileModule"
+              variant="secondary"
+              @click="openCreateFileDialog()"
+            >
+              <el-icon class="module-detail__button-icon"><Plus /></el-icon>
+              {{ isStudyModule ? '上传资料' : '上传证件' }}
             </AppButton>
           </div>
         </div>
@@ -2233,7 +2642,23 @@ watch(
                       <span>{{ formatSize(item.size) }}</span>
                       <span>{{ item.updatedAt }}</span>
                     </div>
+                    <div v-if="isEditableFileModule" class="module-detail__file-actions">
+                      <el-button v-if="isImagePreviewable(item)" class="module-detail__file-action" text @click="openGenericImagePreviewDialog(item)">预览</el-button>
+                      <el-button class="module-detail__file-action" text @click="downloadFile(item)">下载</el-button>
+                      <el-button class="module-detail__file-action" type="primary" text @click="openEditFileDialog(item)">编辑</el-button>
+                      <el-button class="module-detail__file-action" type="danger" text @click="confirmDeleteFile(item)">删除</el-button>
+                    </div>
                   </article>
+                  <button
+                    v-if="isEditableFileModule"
+                    :key="`upload-${group.name}`"
+                    class="module-detail__file-upload-row"
+                    type="button"
+                    @click="openCreateFileDialog(group.name)"
+                  >
+                    <el-icon class="module-detail__button-icon"><Plus /></el-icon>
+                    <span>{{ isStudyModule ? '上传新资料' : '上传新证件' }}</span>
+                  </button>
                 </TransitionGroup>
               </section>
             </template>
@@ -2894,6 +3319,134 @@ watch(
     </el-dialog>
 
     <el-dialog
+      v-model="fileDialogVisible"
+      class="module-detail__file-dialog"
+      width="680px"
+      :close-on-click-modal="!props.fileOperationLoading"
+      :close-on-press-escape="!props.fileOperationLoading"
+      :show-close="false"
+      :lock-scroll="false"
+      align-center
+      destroy-on-close
+    >
+      <template #header>
+        <header class="module-detail__drawer-head">
+          <div>
+            <p class="module-detail__drawer-eyebrow">File</p>
+            <h2 class="module-detail__drawer-title">{{ fileDialogTitle }}</h2>
+          </div>
+          <el-button circle text aria-label="关闭弹窗" @click="closeFileDialog">
+            <el-icon><Close /></el-icon>
+          </el-button>
+        </header>
+      </template>
+
+      <el-form
+        ref="fileFormRef"
+        class="module-detail__drawer-form module-detail__drawer-form--element module-detail__file-form"
+        :model="fileForm"
+        :rules="fileFormRules"
+        label-position="top"
+        hide-required-asterisk
+        @submit.prevent="submitFileForm"
+      >
+        <el-form-item class="module-detail__drawer-item" label="文件标题" prop="title">
+          <el-input
+            v-model="fileForm.title"
+            placeholder="例如：身份证正面、Vue 学习笔记"
+            clearable
+          />
+        </el-form-item>
+
+        <el-form-item class="module-detail__drawer-item" label="分类" prop="category">
+          <el-select
+            v-model="fileForm.category"
+            placeholder="选择或输入分类"
+            filterable
+            allow-create
+            default-first-option
+            clearable
+          >
+            <el-option
+              v-for="category in fileCategoryOptions"
+              :key="category"
+              :label="category"
+              :value="category"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item
+          class="module-detail__drawer-item module-detail__drawer-item--full module-detail__file-upload"
+          :label="fileDialogMode === 'create' ? '上传文件' : '替换文件'"
+        >
+          <FileDropzone
+            :title="fileDialogMode === 'create' ? '上传图片 / 文档' : '替换图片 / 文档'"
+            :description="fileDialogMode === 'create' ? '支持图片、PDF、Word、Markdown 和 TXT 文件' : '不选择新文件时只保存标题、分类和备注'"
+            :accept="genericFileUploadAccept"
+            :multiple="false"
+            @files-selected="handleGenericFilesSelected"
+          />
+          <p class="module-detail__file-upload-tip">
+            保存后会写入 uploads 当前账号 {{ props.module.key }} 目录，单个文件最大 25MB。
+          </p>
+        </el-form-item>
+
+        <el-form-item class="module-detail__drawer-item module-detail__drawer-item--full" :label="fileDialogMode === 'create' ? '已选择文件' : '当前文件'">
+          <div class="module-detail__file-selected">
+            <span v-if="selectedGenericFile" class="module-detail__file-selected-name">
+              {{ fileForm.originalName }} · {{ formatSize(selectedGenericFile.size) }}
+            </span>
+            <span v-else-if="fileForm.originalName" class="module-detail__file-selected-name">
+              {{ fileForm.originalName }}
+            </span>
+            <span v-else class="module-detail__file-selected-empty">尚未选择文件</span>
+          </div>
+        </el-form-item>
+
+        <el-form-item class="module-detail__drawer-item module-detail__drawer-item--full" label="备注" prop="remark">
+          <el-input
+            v-model="fileForm.remark"
+            placeholder="补充文件用途、来源或说明"
+            type="textarea"
+            :autosize="{ minRows: 3, maxRows: 5 }"
+          />
+        </el-form-item>
+
+        <el-alert
+          v-if="fileDialogErrorMessage"
+          class="module-detail__drawer-alert"
+          :title="fileDialogErrorMessage"
+          type="error"
+          show-icon
+          :closable="false"
+        />
+      </el-form>
+
+      <template #footer>
+        <div class="module-detail__drawer-actions">
+          <el-button
+            v-if="fileDialogMode === 'edit' && fileForm.id"
+            type="danger"
+            text
+            :loading="props.fileOperationLoading"
+            @click="confirmDeleteCurrentFile"
+          >
+            删除文件
+          </el-button>
+          <el-button @click="closeFileDialog">取消</el-button>
+          <el-button
+            type="primary"
+            :loading="props.fileOperationLoading"
+            @click="submitFileForm"
+          >
+            {{ fileDialogMode === 'create' ? '保存' : '保存修改' }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-model="imagePreviewDialogVisible"
       class="module-detail__image-preview-dialog"
       width="760px"
@@ -2933,7 +3486,7 @@ watch(
             <el-icon><Download /></el-icon>
             下载
           </el-button>
-          <el-button v-if="previewImageItem" type="primary" @click="openEditImageDialog(previewImageItem)">
+          <el-button v-if="previewImageItem" type="primary" @click="openEditPreviewImageDialog(previewImageItem)">
             编辑
           </el-button>
           <el-button @click="closeImagePreviewDialog">关闭</el-button>

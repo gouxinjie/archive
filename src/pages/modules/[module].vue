@@ -19,6 +19,7 @@ import type {
   ArchiveModuleKey,
   DocumentFormPayload,
   DocumentListItem,
+  FileAssetFormPayload,
   FileAssetListItem,
   ImageFormPayload,
   ModuleDetailData,
@@ -68,6 +69,10 @@ const imageOperationLoading = ref(false);
 const imageOperationError = ref('');
 const imageSuccessVersion = ref(0);
 const imageDeleteSuccessVersion = ref(0);
+const fileOperationLoading = ref(false);
+const fileOperationError = ref('');
+const fileSuccessVersion = ref(0);
+const fileDeleteSuccessVersion = ref(0);
 let moduleRequestSerial = 0;
 const activeModuleLoadSignature = useState<string>('archive-module-active-load-signature', () => '');
 
@@ -553,6 +558,82 @@ const handleDeleteImage = async (id: string): Promise<void> => {
   }
 };
 
+const handleSaveFile = async (payload: FileAssetFormPayload): Promise<void> => {
+  fileOperationLoading.value = true;
+  fileOperationError.value = '';
+  moduleError.value = '';
+
+  try {
+    let response: ApiResponse<{ id: string }>;
+
+    if (payload.id) {
+      const formData = new FormData();
+      formData.append('title', payload.title);
+      formData.append('category', payload.category);
+      formData.append('remark', payload.remark);
+
+      if (payload.file) {
+        formData.append('file', payload.file, payload.file.name);
+      }
+
+      response = await uploadRequest<{ id: string }>(`/api/files/${payload.module}/${payload.id}`, formData, {
+        method: 'PUT'
+      });
+    } else {
+      if (!payload.file) {
+        throw new Error('请先选择需要上传的文件');
+      }
+
+      const formData = new FormData();
+      formData.append('title', payload.title);
+      formData.append('category', payload.category);
+      formData.append('remark', payload.remark);
+      formData.append('file', payload.file, payload.file.name);
+      response = await uploadRequest<{ id: string }>(`/api/files/${payload.module}`, formData);
+    }
+
+    if (!response.success) {
+      fileOperationError.value = response.message;
+      return;
+    }
+
+    fileSuccessVersion.value += 1;
+    ElMessage.success(payload.id ? '文件信息保存成功' : '文件上传成功');
+    await loadPageData(currentKeyword.value, true);
+  } catch (error: unknown) {
+    fileOperationError.value = error instanceof Error ? error.message : '文件保存失败';
+    console.error(fileOperationError.value);
+  } finally {
+    fileOperationLoading.value = false;
+  }
+};
+
+const handleDeleteFile = async (payload: { module: ArchiveModuleKey; id: string }): Promise<void> => {
+  fileOperationLoading.value = true;
+  fileOperationError.value = '';
+  moduleError.value = '';
+
+  try {
+    const response = await request<{ id: string }>(`/api/files/${payload.module}/${payload.id}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.success) {
+      moduleError.value = response.message;
+      return;
+    }
+
+    fileDeleteSuccessVersion.value += 1;
+    ElMessage.success('文件删除成功');
+    await loadPageData(currentKeyword.value, true);
+  } catch (error: unknown) {
+    moduleError.value = error instanceof Error ? error.message : '文件删除失败';
+    console.error(moduleError.value);
+  } finally {
+    fileOperationLoading.value = false;
+  }
+};
+
 onMounted(async () => {
   if (!session.initialized.value) {
     await session.loadStatus();
@@ -575,6 +656,7 @@ watch(
     documentOperationError.value = '';
     resumeOperationError.value = '';
     imageOperationError.value = '';
+    fileOperationError.value = '';
     await loadPageData('');
   },
   { immediate: true }
@@ -615,6 +697,10 @@ watch(
     :image-operation-error="imageOperationError"
     :image-success-version="imageSuccessVersion"
     :image-delete-success-version="imageDeleteSuccessVersion"
+    :file-operation-loading="fileOperationLoading"
+    :file-operation-error="fileOperationError"
+    :file-success-version="fileSuccessVersion"
+    :file-delete-success-version="fileDeleteSuccessVersion"
     @lock="handleLock"
     @back-home="handleBackHome"
     @open-module="handleOpenModule"
@@ -627,5 +713,7 @@ watch(
     @delete-resume="handleDeleteResume"
     @save-image="handleSaveImage"
     @delete-image="handleDeleteImage"
+    @save-file="handleSaveFile"
+    @delete-file="handleDeleteFile"
   />
 </template>

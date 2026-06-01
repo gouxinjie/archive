@@ -2,24 +2,12 @@
  * 简历文件查看和下载接口
  */
 
-import { readFileSync } from 'node:fs';
-import { basename } from 'node:path';
-import { defineEventHandler, getRouterParam, setHeader } from 'h3';
+import { defineEventHandler, getRouterParam } from 'h3';
 import { createErrorResponse, getErrorMessage } from '../../utils/apiResponse';
 import { getFileAssetById } from '../../utils/database';
-import { resolveUploadPath, storedFileExists } from '../../utils/fileStorage';
+import { createStoredFileResponse } from '../../utils/fileResponse';
+import { storedFileExists } from '../../utils/fileStorage';
 import { assertAuthenticated, assertQueryUserId } from '../../utils/security';
-
-/**
- * 生成下载响应头文件名
- * @param fileName - 原始文件名
- * @returns Content-Disposition 文件名片段
- * @throws 不抛出异常
- */
-const createContentDisposition = (fileName: string): string => {
-  const fallbackName = basename(fileName).replace(/[^\w.-]/g, '-');
-  return `inline; filename="${fallbackName || 'resume'}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
-};
 
 export default defineEventHandler(async (event) => {
   try {
@@ -42,12 +30,7 @@ export default defineEventHandler(async (event) => {
       return createErrorResponse('RESUME_FILE_MISSING', '简历文件不存在');
     }
 
-    setHeader(event, 'Content-Type', resume.mime_type);
-    setHeader(event, 'Content-Length', resume.size);
-    setHeader(event, 'Content-Disposition', createContentDisposition(resume.original_name));
-
-    const absolutePath = resolveUploadPath(resume.storage_path);
-    return readFileSync(absolutePath, { encoding: null });
+    return createStoredFileResponse(event, resume, false, 'resume');
   } catch (error: unknown) {
     console.error(getErrorMessage(error));
     return createErrorResponse('RESUME_DOWNLOAD_FAILED', getErrorMessage(error));

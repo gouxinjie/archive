@@ -152,6 +152,21 @@ export interface ImageFormPayload {
   remark: string;
 }
 
+export interface FileAssetFormPayload {
+  /** 类型：ArchiveModuleKey；含义：文件所属模块；是否必填：是；默认值：无 */
+  module: ArchiveModuleKey;
+  /** 类型：字符串或 undefined；含义：文件记录唯一标识；是否必填：编辑时必填；默认值：undefined */
+  id?: string;
+  /** 类型：字符串；含义：文件标题；是否必填：是；默认值：空字符串 */
+  title: string;
+  /** 类型：字符串；含义：文件分类；是否必填：否；默认值：其他 */
+  category: string;
+  /** 类型：File 或 undefined；含义：上传或替换的图片/文档文件；是否必填：新增时必填；默认值：undefined */
+  file?: File;
+  /** 类型：字符串；含义：文件备注；是否必填：否；默认值：空字符串 */
+  remark: string;
+}
+
 export interface ModuleDetailData {
   /** 类型：ArchiveModuleConfig；含义：模块配置；是否必填：是；默认值：无 */
   module: ArchiveModuleConfig;

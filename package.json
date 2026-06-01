@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "nuxt dev",
-    "build": "node scripts/with-env.mjs .env.production nuxt build",
-    "build:local": "nuxt build",
+    "build": "npm run build:prod",
+    "build:prod": "node scripts/with-env.mjs .env.production nuxt build",
     "start": "node scripts/with-env.mjs .env.production node .output/server/index.mjs",
     "preview": "node scripts/with-env.mjs .env.production nuxt preview",
     "typecheck": "nuxt typecheck",

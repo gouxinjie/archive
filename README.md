@@ -138,13 +138,13 @@ npm run typecheck
 npm run build
 ```
 
-加载 `.env.production` 并构建生产版本。
+等同于 `npm run build:prod`，按生产方式构建产物。
 
 ```bash
-npm run build:local
+npm run build:prod
 ```
 
-不加载 `.env.production`，仅用于本地临时构建检查。
+优先加载 `.env.production` 构建生产产物；CI 中缺少该文件时，应先准备一个临时 `.env.production`。
 
 ```bash
 npm run start
@@ -241,7 +241,7 @@ npm run start
 
 `npm run start` 同样会自动读取 `.env.production`，确保运行时的 Cookie 密钥、数据库路径和上传目录与构建时一致。
 
-如果使用 GitHub Actions 自动部署到 ECS，参考 [ECS 使用 GitHub Actions 自动部署](./docs/ecs-github-actions-deploy.md)。
+如果使用 GitHub Actions 自动部署到 ECS，参考 [Nuxt 项目部署到 ECS 的一次完整实践](./docs/archive-ecs-deploy-practice-blog.md)。
 
 生产环境至少需要修改：
 

@@ -94,8 +94,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Prepare build env file
+        run: |
+          if [ ! -f .env.production ]; then
+            cp .env.production.example .env.production
+          fi
+
       - name: Build Nuxt artifact
-        run: npm run build:local
+        run: npm run build:prod
 
       - name: Prepare deploy artifact
         run: |

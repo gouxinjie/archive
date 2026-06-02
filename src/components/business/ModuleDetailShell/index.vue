@@ -50,6 +50,10 @@ import {
   normalizeStudyCategory
 } from '~/constants/archiveCategories';
 import { PASSWORD_CATEGORY_OPTIONS } from '~/constants/passwordCategories';
+import {
+  PASSWORD_LOGIN_METHOD_OPTION_GROUPS,
+  normalizePasswordLoginMethod
+} from '~/constants/passwordLoginMethods';
 import type { DashboardSummaryData, ResumePreviewData } from '~/types/api';
 import type {
   ArchiveModuleConfig,
@@ -261,29 +265,59 @@ const passwordForm = ref<PasswordFormPayload>({
   remark: ''
 });
 const passwordCategoryOptions = [...PASSWORD_CATEGORY_OPTIONS];
-const loginMethodOptionGroups: LoginMethodOptionGroup[] = [
-  {
-    label: '常规方式',
-    options: ['手机号', '邮箱', '账号密码']
-  },
-  {
-    label: '社交通讯',
-    options: ['微信', 'QQ', '企业微信']
-  },
-  {
-    label: '开发账号',
-    options: ['GitHub', 'Gitee', '谷歌账号']
-  },
-  {
-    label: '平台账号',
-    options: ['Apple ID', 'Microsoft 账号', '支付宝']
-  },
-  {
-    label: '其他方式',
-    options: ['扫码登录', '单点登录']
+const loginMethodOptionGroups: LoginMethodOptionGroup[] = PASSWORD_LOGIN_METHOD_OPTION_GROUPS;
+const isValidMainlandChinaPhone = (value: string): boolean => {
+  const normalized = value.replace(/[\s-]/g, '');
+  return /^(?:\+?86)?1[3-9]\d{9}$/.test(normalized);
+};
+const isValidEmail = (value: string): boolean => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+};
+const validateOptionalPhone = (_rule: unknown, value: string, callback: (error?: Error) => void): void => {
+  if (!value || !value.trim()) {
+    callback();
+    return;
   }
-];
+
+  if (!isValidMainlandChinaPhone(value.trim())) {
+    callback(new Error('请输入中国大陆手机号，支持 +86 前缀'));
+    return;
+  }
+
+  callback();
+};
+const validateOptionalEmail = (_rule: unknown, value: string, callback: (error?: Error) => void): void => {
+  if (!value || !value.trim()) {
+    callback();
+    return;
+  }
+
+  if (!isValidEmail(value.trim())) {
+    callback(new Error('请输入正确的邮箱地址'));
+    return;
+  }
+
+  callback();
+};
+const validateLoginMethod = (_rule: unknown, value: string, callback: (error?: Error) => void): void => {
+  try {
+    normalizePasswordLoginMethod(value, passwordForm.value.account, passwordForm.value.email);
+    callback();
+  } catch (error: unknown) {
+    callback(error instanceof Error ? error : new Error('登录方式格式不正确'));
+  }
+};
+const getDisplayLoginMethod = (value: string | null | undefined, account: string, email: string): string => {
+  try {
+    return normalizePasswordLoginMethod(value, account, email) || '';
+  } catch {
+    return value?.trim() || '';
+  }
+};
 const passwordFormRules: FormRules<PasswordFormPayload> = {
+  loginMethod: [{ validator: validateLoginMethod, trigger: 'change' }],
+  phone: [{ validator: validateOptionalPhone, trigger: 'blur' }],
+  email: [{ validator: validateOptionalEmail, trigger: 'blur' }],
   title: [{ required: true, message: '请输入平台名称', trigger: 'blur' }],
   category: [{ required: true, message: '请选择或输入分类', trigger: 'change' }]
 };
@@ -923,6 +957,104 @@ const getImageExtensionText = (item: FileAssetListItem): string => {
 };
 
 /**
+ * 将 SQLite 的 UTC 时间字符串格式化为当前时区显示文本
+ * @param value - 数据库返回的时间字符串
+ * @returns 本地时区时间文本，解析失败时返回原值
+ * @throws 不抛出异常
+ */
+const chinaDateTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23'
+});
+
+/**
+ * 按中国时区格式化日期对象
+ * @param date - Date 实例
+ * @returns yyyy-MM-dd HH:mm:ss 格式文本
+ * @throws 不抛出异常
+ */
+const formatChinaDateTime = (date: Date): string => {
+  let year = '';
+  let month = '';
+  let day = '';
+  let hour = '';
+  let minute = '';
+  let second = '';
+
+  for (const part of chinaDateTimeFormatter.formatToParts(date)) {
+    switch (part.type) {
+      case 'year':
+        year = part.value;
+        break;
+      case 'month':
+        month = part.value;
+        break;
+      case 'day':
+        day = part.value;
+        break;
+      case 'hour':
+        hour = part.value;
+        break;
+      case 'minute':
+        minute = part.value;
+        break;
+      case 'second':
+        second = part.value;
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (!year || !month || !day || !hour || !minute || !second) {
+    return '';
+  }
+
+  return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+};
+
+/**
+ * 将 SQLite 的 UTC 时间字符串格式化为中国时区显示文本
+ * @param value - 数据库返回的时间字符串
+ * @returns 中国时区时间文本，解析失败时返回原值
+ * @throws 不抛出异常
+ */
+const formatUpdatedAt = (value: string): string => {
+  const normalizedValue = value.trim();
+  const match = normalizedValue.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
+
+  if (!match) {
+    const fallbackDate = new Date(normalizedValue);
+
+    if (Number.isNaN(fallbackDate.getTime())) {
+      return value;
+    }
+
+    const formattedText = formatChinaDateTime(fallbackDate);
+    return formattedText || value;
+  }
+
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText] = match;
+  const date = new Date(Date.UTC(
+    Number(yearText),
+    Number(monthText) - 1,
+    Number(dayText),
+    Number(hourText),
+    Number(minuteText),
+    Number(secondText)
+  ));
+
+  const formattedText = formatChinaDateTime(date);
+  return formattedText || value;
+};
+
+/**
  * 判断文件是否为可预览图片
  * @param item - 文件记录
  * @returns 是否为图片 MIME 类型
@@ -1073,7 +1205,7 @@ const fillPasswordForm = (item: PasswordListItem): void => {
     title: item.title,
     category: item.category,
     loginUrl: item.loginUrl || '',
-    loginMethod: item.loginMethod || '',
+    loginMethod: getDisplayLoginMethod(item.loginMethod, item.account || '', item.email || ''),
     account: item.account || '',
     password: item.password || '',
     phone: item.phone || '',
@@ -1101,6 +1233,16 @@ const closePasswordDrawer = (): void => {
   passwordSubmitAttempted.value = false;
 };
 
+const trimPasswordField = (field: 'title' | 'loginUrl' | 'account'): void => {
+  passwordForm.value[field] = passwordForm.value[field].trim();
+};
+
+const normalizePasswordForm = (): void => {
+  trimPasswordField('title');
+  trimPasswordField('loginUrl');
+  trimPasswordField('account');
+};
+
 const submitPasswordForm = async (): Promise<void> => {
   if (isPasswordDialogReadonly.value || props.passwordOperationLoading) {
     return;
@@ -1110,11 +1252,19 @@ const submitPasswordForm = async (): Promise<void> => {
     return;
   }
 
+  normalizePasswordForm();
+
   const valid = await passwordFormRef.value.validate();
 
   if (!valid) {
     return;
   }
+
+  passwordForm.value.loginMethod = normalizePasswordLoginMethod(
+    passwordForm.value.loginMethod,
+    passwordForm.value.account,
+    passwordForm.value.email
+  ) || '';
 
   passwordFormError.value = '';
   passwordSubmitAttempted.value = true;
@@ -2520,7 +2670,7 @@ watch(
                         <span class="module-detail__simple-meta">{{ item.originalName }}</span>
                         <span class="module-detail__document-card-meta">
                           <span class="module-detail__document-card-size">{{ formatSize(item.size) }}</span>
-                          <span class="module-detail__document-card-date">{{ item.updatedAt }}</span>
+                          <span class="module-detail__document-card-date">{{ formatUpdatedAt(item.updatedAt) }}</span>
                         </span>
                       </span>
 
@@ -2564,7 +2714,7 @@ watch(
                       <span class="module-detail__resume-card-main">
                         <span class="module-detail__simple-title">{{ item.title }}</span>
                         <span class="module-detail__simple-meta">{{ item.originalName }}</span>
-                        <span class="module-detail__resume-card-date">{{ item.updatedAt }}</span>
+                        <span class="module-detail__resume-card-date">{{ formatUpdatedAt(item.updatedAt) }}</span>
                         <span class="module-detail__resume-card-size">{{ formatSize(item.size) }}</span>
                       </span>
 
@@ -2623,7 +2773,7 @@ watch(
                       <div class="module-detail__image-card-main">
                         <span class="module-detail__simple-title">{{ item.title }}</span>
                         <span class="module-detail__image-card-meta">
-                          <span>{{ item.updatedAt }}</span>
+                          <span>{{ formatUpdatedAt(item.updatedAt) }}</span>
                           <span>{{ formatSize(item.size) }}</span>
                         </span>
                       </div>
@@ -2681,7 +2831,7 @@ watch(
                     <div class="module-detail__file-meta">
                       <span>{{ item.mimeType }}</span>
                       <span>{{ formatSize(item.size) }}</span>
-                      <span>{{ item.updatedAt }}</span>
+                      <span>{{ formatUpdatedAt(item.updatedAt) }}</span>
                     </div>
                     <div v-if="isEditableFileModule" class="module-detail__file-actions">
                       <el-button v-if="isImagePreviewable(item)" class="module-detail__file-action" text @click="openGenericImagePreviewDialog(item)">预览</el-button>
@@ -2748,6 +2898,7 @@ watch(
             placeholder="例如：阿里云控制台"
             :readonly="isPasswordDialogReadonly"
             :clearable="!isPasswordDialogReadonly"
+            @blur="trimPasswordField('title')"
           />
         </el-form-item>
 
@@ -2780,6 +2931,7 @@ watch(
             placeholder="https://example.com"
             :readonly="isPasswordDialogReadonly"
             :clearable="!isPasswordDialogReadonly"
+            @blur="trimPasswordField('loginUrl')"
           />
         </el-form-item>
 
@@ -2820,6 +2972,7 @@ watch(
             placeholder="账号、手机号、邮箱或微信号"
             :readonly="isPasswordDialogReadonly"
             :clearable="!isPasswordDialogReadonly"
+            @blur="trimPasswordField('account')"
           />
         </el-form-item>
 
@@ -3525,7 +3678,7 @@ watch(
         <div class="module-detail__image-preview-meta">
           <span>{{ previewImageItem.originalName }}</span>
           <span>{{ formatSize(previewImageItem.size) }}</span>
-          <span>{{ previewImageItem.updatedAt }}</span>
+          <span>{{ formatUpdatedAt(previewImageItem.updatedAt) }}</span>
         </div>
       </div>
 

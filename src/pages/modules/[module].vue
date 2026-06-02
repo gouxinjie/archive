@@ -4,11 +4,12 @@
  * @description 个人档案模块详情页
  * @author Codex
  * @created 2026-05-29
- * @updated 2026-05-29
+ * @updated 2026-06-02
  */
 
 import { computed, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
+import ArchivePageLoading from '~/components/commons/ArchivePageLoading/index.vue';
 import EntryGate from '~/components/business/EntryGate/index.vue';
 import ModuleDetailShell from '~/components/business/ModuleDetailShell/index.vue';
 import { useArchiveSession } from '~/composables/useArchiveSession';
@@ -717,9 +718,11 @@ watch(
 </script>
 
 <template>
-  <div v-if="!session.initialized.value" class="archive-page-loading">
-    正在进入个人档案...
-  </div>
+  <ArchivePageLoading
+    v-if="!session.initialized.value"
+    title="正在进入个人档案"
+    description="正在同步当前模块数据，请稍候。"
+  />
   <EntryGate
     v-else-if="!session.authenticated.value"
     :loading="session.loading.value"

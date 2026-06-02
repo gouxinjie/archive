@@ -4,10 +4,11 @@
  * @description 个人档案首页，负责登录状态和首页统计数据
  * @author Codex
  * @created 2026-05-29
- * @updated 2026-05-29
+ * @updated 2026-06-02
  */
 
 import { computed, onMounted, ref, watch } from 'vue';
+import ArchivePageLoading from '~/components/commons/ArchivePageLoading/index.vue';
 import DashboardShell from '~/components/business/DashboardShell/index.vue';
 import EntryGate from '~/components/business/EntryGate/index.vue';
 import { useArchiveSession } from '~/composables/useArchiveSession';
@@ -90,9 +91,11 @@ watch(
 </script>
 
 <template>
-  <div v-if="!session.initialized.value" class="archive-page-loading">
-    正在进入个人档案...
-  </div>
+  <ArchivePageLoading
+    v-if="!session.initialized.value"
+    title="正在进入个人档案"
+    description="正在校验登录状态，请稍候。"
+  />
   <EntryGate
     v-else-if="!session.authenticated.value"
     :loading="session.loading.value"

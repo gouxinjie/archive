@@ -28,16 +28,6 @@ body {
   --el-mask-color: rgba(21, 33, 59, 0.28);
 }
 
-.archive-page-loading {
-  align-items: center;
-  background: $color-bg-main;
-  color: $color-primary;
-  display: grid;
-  font-size: 14px;
-  min-height: 100vh;
-  place-items: center;
-}
-
 .page-enter-active,
 .page-leave-active {
   transition:

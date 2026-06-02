@@ -8,6 +8,7 @@ import type { Database as DatabaseConnection } from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { normalizeDocumentCategory, normalizeStudyCategory } from '../../src/constants/archiveCategories';
+import { normalizePasswordLoginMethod } from '../../src/constants/passwordLoginMethods';
 import { getLegacyPasswordCategoryEntries, normalizePasswordCategory } from '../../src/constants/passwordCategories';
 
 let databaseConnection: DatabaseConnection | null = null;
@@ -24,6 +25,23 @@ interface FileAssetCategoryMigrationRow {
   id: string;
   module: string;
   category: string | null;
+}
+
+interface PasswordLoginMethodMigrationRow {
+  id: string;
+  login_method: string | null;
+  account: string | null;
+  email: string | null;
+}
+
+interface DemoSeedPasswordLoginMethodPatch {
+  id: string;
+  beforeLoginMethod: string;
+  beforeAccount: string;
+  beforeEmail: string;
+  nextLoginMethod: string;
+  nextAccount: string;
+  nextEmail: string;
 }
 
 export interface ArchiveProfileRow {
@@ -93,6 +111,45 @@ export interface FileAssetInput {
   size: number;
   remark: string | null;
 }
+
+const DEMO_SEED_PASSWORD_LOGIN_METHOD_PATCHES: readonly DemoSeedPasswordLoginMethodPatch[] = [
+  {
+    id: 'seed-password-aliyun',
+    beforeLoginMethod: '邮箱',
+    beforeAccount: 'archive@example.com',
+    beforeEmail: 'archive@example.com',
+    nextLoginMethod: 'QQ邮箱',
+    nextAccount: 'archive.demo@qq.com',
+    nextEmail: 'archive.demo@qq.com'
+  },
+  {
+    id: 'seed-password-google',
+    beforeLoginMethod: '邮箱',
+    beforeAccount: 'archive.dev@gmail.com',
+    beforeEmail: 'archive.dev@gmail.com',
+    nextLoginMethod: '网易邮箱',
+    nextAccount: 'archive.demo@163.com',
+    nextEmail: 'archive.demo@163.com'
+  },
+  {
+    id: 'seed-password-qqmail',
+    beforeLoginMethod: 'QQ',
+    beforeAccount: '100000001',
+    beforeEmail: '100000001@qq.com',
+    nextLoginMethod: 'QQ邮箱',
+    nextAccount: '100000001@qq.com',
+    nextEmail: '100000001@qq.com'
+  },
+  {
+    id: 'seed-password-steam',
+    beforeLoginMethod: '邮箱',
+    beforeAccount: 'game@example.com',
+    beforeEmail: 'game@example.com',
+    nextLoginMethod: 'QQ邮箱',
+    nextAccount: 'game.demo@qq.com',
+    nextEmail: 'game.demo@qq.com'
+  }
+];
 
 /**
  * 获取数据库文件路径
@@ -204,6 +261,8 @@ const initializeDatabase = (database: DatabaseConnection): void => {
   ensureDefaultUsers(database);
   ensureDefaultProfiles(database);
   migrateOwnerDataToProfiles(database);
+  migratePasswordLoginMethods(database);
+  migrateDemoSeedPasswordLoginMethods(database);
 };
 
 /**
@@ -244,6 +303,41 @@ const migrateLegacyPasswordCategories = (database: DatabaseConnection): void => 
 
   for (const [legacyCategory, normalizedCategory] of getLegacyPasswordCategoryEntries()) {
     updateCategory.run(normalizedCategory, legacyCategory);
+  }
+};
+
+/**
+ * 迁移历史密码登录方式
+ * @param database - SQLite 数据库连接
+ * @returns 无返回值
+ * @throws 当迁移失败时抛出异常
+ */
+const migratePasswordLoginMethods = (database: DatabaseConnection): void => {
+  const rows = database
+    .prepare(`
+      SELECT id, login_method, account, email
+      FROM password_items
+      WHERE login_method IS NOT NULL
+    `)
+    .all() as PasswordLoginMethodMigrationRow[];
+  const updateLoginMethod = database.prepare(`
+    UPDATE password_items
+    SET login_method = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+
+  for (const row of rows) {
+    try {
+      const normalizedLoginMethod = normalizePasswordLoginMethod(row.login_method, row.account, row.email, {
+        allowLegacyEmailMethod: true
+      });
+
+      if (normalizedLoginMethod !== row.login_method) {
+        updateLoginMethod.run(normalizedLoginMethod, row.id);
+      }
+    } catch {
+      // 历史异常数据保留原值，避免启动迁移因单条脏数据中断。
+    }
   }
 };
 
@@ -374,6 +468,35 @@ const migrateOwnerDataToProfiles = (database: DatabaseConnection): void => {
 };
 
 /**
+ * 修正演示种子中的历史邮箱登录方式
+ * @param database - SQLite 数据库连接
+ * @returns 无返回值
+ * @throws 当迁移失败时抛出异常
+ */
+const migrateDemoSeedPasswordLoginMethods = (database: DatabaseConnection): void => {
+  const updateSeedPassword = database.prepare(`
+    UPDATE password_items
+    SET login_method = ?, account = ?, email = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+      AND login_method = ?
+      AND account = ?
+      AND ifnull(email, '') = ?
+  `);
+
+  for (const patch of DEMO_SEED_PASSWORD_LOGIN_METHOD_PATCHES) {
+    updateSeedPassword.run(
+      patch.nextLoginMethod,
+      patch.nextAccount,
+      patch.nextEmail,
+      patch.id,
+      patch.beforeLoginMethod,
+      patch.beforeAccount,
+      patch.beforeEmail
+    );
+  }
+};
+
+/**
  * 获取应用设置
  * @param key - 设置键名
  * @returns 设置值，未找到时返回 null
@@ -463,6 +586,33 @@ export const countPasswords = (profileId: string): number => {
   const database = getDatabase();
   const row = database.prepare('SELECT COUNT(*) AS total FROM password_items WHERE user_id = ?').get(profileId) as CountRow;
   return row.total;
+};
+
+/**
+ * 查询指定用户的密码记录
+ * @param id - 密码记录标识
+ * @param profileId - 档案标识
+ * @returns 密码记录，不存在时返回 null
+ * @throws 当查询失败时抛出异常
+ */
+export const getPasswordItemById = (id: string, profileId: string): PasswordItemRow | null => {
+  const database = getDatabase();
+  const row = database
+    .prepare(`
+      SELECT id, title, category, login_url, login_method, account, password, phone, email, remark, updated_at
+      FROM password_items
+      WHERE id = ? AND user_id = ?
+    `)
+    .get(id, profileId) as PasswordItemRow | undefined;
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    ...row,
+    category: normalizePasswordCategory(row.category)
+  };
 };
 
 /**

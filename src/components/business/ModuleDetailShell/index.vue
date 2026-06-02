@@ -51,6 +51,7 @@ import {
 } from '~/constants/archiveCategories';
 import { PASSWORD_CATEGORY_OPTIONS } from '~/constants/passwordCategories';
 import {
+  isLegacyPasswordEmailLoginMethod,
   PASSWORD_LOGIN_METHOD_OPTION_GROUPS,
   normalizePasswordLoginMethod
 } from '~/constants/passwordLoginMethods';
@@ -253,6 +254,7 @@ const passwordDialogMode = ref<'create' | 'edit' | 'view'>('create');
 const passwordFormError = ref('');
 const passwordSubmitAttempted = ref(false);
 const passwordFormRef = ref<FormInstance>();
+const originalPasswordLoginMethod = ref('');
 const passwordForm = ref<PasswordFormPayload>({
   title: '',
   category: '其他',
@@ -266,6 +268,16 @@ const passwordForm = ref<PasswordFormPayload>({
 });
 const passwordCategoryOptions = [...PASSWORD_CATEGORY_OPTIONS];
 const loginMethodOptionGroups: LoginMethodOptionGroup[] = PASSWORD_LOGIN_METHOD_OPTION_GROUPS;
+const shouldAllowLegacyPasswordLoginMethod = (value: string | null | undefined): boolean => {
+  const normalizedValue = value?.trim() || '';
+  const normalizedOriginalValue = originalPasswordLoginMethod.value.trim();
+
+  if (!normalizedValue || normalizedValue !== normalizedOriginalValue) {
+    return false;
+  }
+
+  return isLegacyPasswordEmailLoginMethod(normalizedValue);
+};
 const isValidMainlandChinaPhone = (value: string): boolean => {
   const normalized = value.replace(/[\s-]/g, '');
   return /^(?:\+?86)?1[3-9]\d{9}$/.test(normalized);
@@ -301,7 +313,9 @@ const validateOptionalEmail = (_rule: unknown, value: string, callback: (error?:
 };
 const validateLoginMethod = (_rule: unknown, value: string, callback: (error?: Error) => void): void => {
   try {
-    normalizePasswordLoginMethod(value, passwordForm.value.account, passwordForm.value.email);
+    normalizePasswordLoginMethod(value, passwordForm.value.account, passwordForm.value.email, {
+      allowLegacyEmailMethod: shouldAllowLegacyPasswordLoginMethod(value)
+    });
     callback();
   } catch (error: unknown) {
     callback(error instanceof Error ? error : new Error('登录方式格式不正确'));
@@ -1185,6 +1199,7 @@ const openCreatePasswordDrawer = (): void => {
   passwordDialogMode.value = 'create';
   passwordFormError.value = '';
   passwordSubmitAttempted.value = false;
+  originalPasswordLoginMethod.value = '';
   passwordForm.value = {
     title: '',
     category: '其他',
@@ -1200,6 +1215,7 @@ const openCreatePasswordDrawer = (): void => {
 };
 
 const fillPasswordForm = (item: PasswordListItem): void => {
+  originalPasswordLoginMethod.value = item.loginMethod || '';
   passwordForm.value = {
     id: item.id,
     title: item.title,
@@ -1231,6 +1247,7 @@ const switchPasswordDialogToEdit = (): void => {
 const closePasswordDrawer = (): void => {
   passwordDialogVisible.value = false;
   passwordSubmitAttempted.value = false;
+  originalPasswordLoginMethod.value = '';
 };
 
 const trimPasswordField = (field: 'title' | 'loginUrl' | 'account'): void => {
@@ -1263,7 +1280,10 @@ const submitPasswordForm = async (): Promise<void> => {
   passwordForm.value.loginMethod = normalizePasswordLoginMethod(
     passwordForm.value.loginMethod,
     passwordForm.value.account,
-    passwordForm.value.email
+    passwordForm.value.email,
+    {
+      allowLegacyEmailMethod: shouldAllowLegacyPasswordLoginMethod(passwordForm.value.loginMethod)
+    }
   ) || '';
 
   passwordFormError.value = '';
@@ -2344,6 +2364,21 @@ watch(
     if (fileType !== 'md') {
       documentEditorMode.value = 'write';
     }
+  }
+);
+
+watch(
+  () => [passwordForm.value.account, passwordForm.value.email],
+  () => {
+    if (!passwordDialogVisible.value || isPasswordDialogReadonly.value || !passwordFormRef.value) {
+      return;
+    }
+
+    if (!passwordForm.value.loginMethod.trim()) {
+      return;
+    }
+
+    void passwordFormRef.value.validateField('loginMethod').catch(() => undefined);
   }
 );
 

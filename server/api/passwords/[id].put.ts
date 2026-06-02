@@ -4,7 +4,7 @@
 
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import { createErrorResponse, createSuccessResponse, getErrorMessage } from '../../utils/apiResponse';
-import { updatePasswordItem } from '../../utils/database';
+import { getPasswordItemById, updatePasswordItem } from '../../utils/database';
 import { parsePasswordPayload, type PasswordRequestBody } from '../../utils/passwordPayload';
 import { assertAuthenticated, assertCsrfToken } from '../../utils/security';
 
@@ -20,8 +20,15 @@ export default defineEventHandler(async (event) => {
 
     const body = await readBody<PasswordRequestBody>(event);
     const session = assertAuthenticated(event);
+    const existingItem = getPasswordItemById(id, session.profileId);
 
-    const payload = parsePasswordPayload(body);
+    if (!existingItem) {
+      return createErrorResponse('PASSWORD_NOT_FOUND', '密码记录不存在');
+    }
+
+    const payload = parsePasswordPayload(body, {
+      originalLoginMethod: existingItem.login_method
+    });
     const updated = updatePasswordItem({
       id,
       profileId: session.profileId,

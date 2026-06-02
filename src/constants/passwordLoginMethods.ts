@@ -11,6 +11,11 @@ export interface PasswordLoginMethodOptionGroup {
   options: string[];
 }
 
+export interface NormalizePasswordLoginMethodOptions {
+  /** 类型：boolean；含义：是否允许保留历史邮箱类登录方式原值；是否必填：否；默认值：false */
+  allowLegacyEmailMethod?: boolean;
+}
+
 export const PASSWORD_LOGIN_METHOD_OPTION_GROUPS: PasswordLoginMethodOptionGroup[] = [
   {
     label: '常规方式',
@@ -105,17 +110,39 @@ export const inferEmailLoginMethod = (
 };
 
 /**
+ * 判断是否为历史邮箱类登录方式
+ * @param loginMethod - 原始登录方式
+ * @returns 是否为需要兼容保留的历史邮箱类值
+ * @throws 不抛出异常
+ */
+export const isLegacyPasswordEmailLoginMethod = (loginMethod: string | null | undefined): boolean => {
+  const normalizedMethod = normalizeText(loginMethod);
+
+  if (!normalizedMethod) {
+    return false;
+  }
+
+  if (normalizedMethod === QQ_EMAIL_LOGIN_METHOD || normalizedMethod === NETEASE_EMAIL_LOGIN_METHOD) {
+    return false;
+  }
+
+  return normalizedMethod.includes('邮箱');
+};
+
+/**
  * 归一化登录方式
  * @param loginMethod - 原始登录方式
  * @param account - 登录账号
  * @param email - 绑定邮箱
+ * @param options - 归一化附加选项
  * @returns 归一化后的登录方式
  * @throws 当邮箱登录方式不符合约束时抛出异常
  */
 export const normalizePasswordLoginMethod = (
   loginMethod: string | null | undefined,
   account: string | null | undefined,
-  email: string | null | undefined
+  email: string | null | undefined,
+  options: NormalizePasswordLoginMethodOptions = {}
 ): string | null => {
   const normalizedMethod = normalizeText(loginMethod);
 
@@ -130,11 +157,19 @@ export const normalizePasswordLoginMethod = (
       return inferredEmailLoginMethod;
     }
 
+    if (options.allowLegacyEmailMethod) {
+      return normalizedMethod;
+    }
+
     throw new Error('邮箱登录请明确选择 QQ邮箱 或 网易邮箱');
   }
 
   if (normalizedMethod === QQ_EMAIL_LOGIN_METHOD || normalizedMethod === NETEASE_EMAIL_LOGIN_METHOD) {
-    if (inferredEmailLoginMethod && inferredEmailLoginMethod !== normalizedMethod) {
+    if (!inferredEmailLoginMethod) {
+      throw new Error(`选择 ${normalizedMethod} 时，请填写对应的邮箱账号或绑定邮箱`);
+    }
+
+    if (inferredEmailLoginMethod !== normalizedMethod) {
       throw new Error('登录方式与邮箱域名不一致，请选择正确的邮箱类型');
     }
 
@@ -142,6 +177,10 @@ export const normalizePasswordLoginMethod = (
   }
 
   if (normalizedMethod.includes('邮箱')) {
+    if (options.allowLegacyEmailMethod) {
+      return normalizedMethod;
+    }
+
     throw new Error('邮箱登录方式仅支持 QQ邮箱 或 网易邮箱');
   }
 

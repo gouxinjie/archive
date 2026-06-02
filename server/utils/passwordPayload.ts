@@ -3,7 +3,10 @@
  */
 
 import { normalizePasswordCategory } from '../../src/constants/passwordCategories';
-import { normalizePasswordLoginMethod } from '../../src/constants/passwordLoginMethods';
+import {
+  isLegacyPasswordEmailLoginMethod,
+  normalizePasswordLoginMethod
+} from '../../src/constants/passwordLoginMethods';
 
 export interface PasswordRequestBody {
   userId?: unknown;
@@ -30,6 +33,10 @@ export interface NormalizedPasswordPayload {
   remark: string | null;
 }
 
+export interface ParsePasswordPayloadOptions {
+  originalLoginMethod?: string | null;
+}
+
 /**
  * 将未知请求字段转换为字符串
  * @param value - 未知字段值
@@ -43,6 +50,26 @@ const normalizeOptionalText = (value: unknown): string | null => {
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+};
+
+/**
+ * 判断是否允许按历史值保留邮箱类登录方式
+ * @param loginMethod - 当前请求中的登录方式
+ * @param originalLoginMethod - 已存在记录中的登录方式
+ * @returns 是否允许保留历史邮箱类原值
+ * @throws 不抛出异常
+ */
+const shouldAllowLegacyEmailLoginMethod = (
+  loginMethod: string | null,
+  originalLoginMethod: string | null | undefined
+): boolean => {
+  const normalizedOriginalLoginMethod = normalizeOptionalText(originalLoginMethod);
+
+  if (!loginMethod || !normalizedOriginalLoginMethod) {
+    return false;
+  }
+
+  return loginMethod === normalizedOriginalLoginMethod && isLegacyPasswordEmailLoginMethod(loginMethod);
 };
 
 /**
@@ -72,12 +99,18 @@ const isValidEmail = (value: string): boolean => {
  * @returns 标准化后的密码记录
  * @throws 当必填字段缺失时抛出异常
  */
-export const parsePasswordPayload = (body: PasswordRequestBody): NormalizedPasswordPayload => {
+export const parsePasswordPayload = (
+  body: PasswordRequestBody,
+  options: ParsePasswordPayloadOptions = {}
+): NormalizedPasswordPayload => {
   const title = normalizeOptionalText(body.title);
   const account = normalizeOptionalText(body.account);
   const phone = normalizeOptionalText(body.phone);
   const email = normalizeOptionalText(body.email);
-  const loginMethod = normalizePasswordLoginMethod(normalizeOptionalText(body.loginMethod), account, email);
+  const rawLoginMethod = normalizeOptionalText(body.loginMethod);
+  const loginMethod = normalizePasswordLoginMethod(rawLoginMethod, account, email, {
+    allowLegacyEmailMethod: shouldAllowLegacyEmailLoginMethod(rawLoginMethod, options.originalLoginMethod)
+  });
 
   if (!title) {
     throw new Error('平台名称不能为空');

@@ -14,14 +14,14 @@ import {
   replaceDocumentWithTemp,
   writeDocumentTempContent
 } from '../../utils/documentStorage';
-import { assertAuthenticated, assertCsrfToken } from '../../utils/security';
+import { assertAuthenticatedWritable, assertCsrfToken } from '../../utils/security';
 
 export default defineEventHandler(async (event) => {
   try {
     assertCsrfToken(event);
 
     const body = await readBody<DocumentRequestBody>(event);
-    const session = assertAuthenticated(event);
+    const session = assertAuthenticatedWritable(event);
     const payload = parseDocumentPayload(body);
     const id = randomUUID();
     const storagePath = buildDocumentStoragePath(session.profileId, id, payload.fileType);

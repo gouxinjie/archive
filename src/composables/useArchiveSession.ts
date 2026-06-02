@@ -26,12 +26,17 @@ export const useArchiveSession = () => {
     username: null,
     displayName: null,
     profileId: null,
-    profileName: null
+    profileName: null,
+    isDemoAccount: false,
+    readOnly: false,
+    readOnlyMessage: null
   }));
   const loading = useState<boolean>('archive-session-loading', () => false);
   const initialized = useState<boolean>('archive-session-initialized', () => false);
   const errorMessage = useState<string>('archive-session-error', () => '');
   const authenticated = computed<boolean>(() => status.value.authenticated);
+  const isDemoAccount = computed<boolean>(() => Boolean(status.value.isDemoAccount));
+  const readOnly = computed<boolean>(() => Boolean(status.value.readOnly));
 
   const loadStatus = async (): Promise<void> => {
     loading.value = true;
@@ -56,7 +61,11 @@ export const useArchiveSession = () => {
 
   const login = async (username: string, password: string): Promise<UnlockResult> => {
     const response = await submitLogin('/api/auth/login', username, password);
-    await loadStatus();
+
+    if (response.success) {
+      await loadStatus();
+    }
+
     return response;
   };
 
@@ -96,6 +105,8 @@ export const useArchiveSession = () => {
     initialized,
     errorMessage,
     authenticated,
+    isDemoAccount,
+    readOnly,
     loadStatus,
     login,
     lock

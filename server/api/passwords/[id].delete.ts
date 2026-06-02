@@ -5,7 +5,7 @@
 import { defineEventHandler, getRouterParam } from 'h3';
 import { createErrorResponse, createSuccessResponse, getErrorMessage } from '../../utils/apiResponse';
 import { deletePasswordItem } from '../../utils/database';
-import { assertAuthenticated, assertCsrfToken } from '../../utils/security';
+import { assertAuthenticatedWritable, assertCsrfToken } from '../../utils/security';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
       return createErrorResponse('PASSWORD_ID_REQUIRED', '密码记录标识不能为空');
     }
 
-    const session = assertAuthenticated(event);
+    const session = assertAuthenticatedWritable(event);
 
     const deleted = deletePasswordItem(id, session.profileId);
 

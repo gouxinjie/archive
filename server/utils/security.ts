@@ -25,6 +25,8 @@ const SESSION_TTL_SECONDS = 60 * 60 * 8;
 export const FILE_PREVIEW_TTL_SECONDS = 60 * 10;
 const FILE_PREVIEW_PURPOSE = 'file-preview';
 const ARCHIVE_MODULE_KEYS: ArchiveModuleKey[] = ['passwords', 'documents', 'resumes', 'images', 'certificates', 'study'];
+export const DEMO_READONLY_MESSAGE = '演示账号仅支持查看，不支持新增、编辑、上传、删除或下载。';
+export const DEMO_DOWNLOAD_MESSAGE = '演示账号仅支持查看，不支持下载文件。';
 
 let developmentSessionSecret: string | null = null;
 
@@ -465,6 +467,38 @@ export const assertAuthenticated = (event: H3Event): ArchiveSession => {
     throw new Error('请先登录账号');
   }
 
+  return session;
+};
+
+export const isDemoArchiveSession = (session: Pick<ArchiveSession, 'userId'> | null | undefined): boolean => {
+  return session?.userId === 'demo';
+};
+
+export const getSessionReadOnlyMessage = (session: Pick<ArchiveSession, 'userId'> | null | undefined): string | null => {
+  return isDemoArchiveSession(session) ? DEMO_READONLY_MESSAGE : null;
+};
+
+export const assertSessionWritable = (session: Pick<ArchiveSession, 'userId'>): void => {
+  if (isDemoArchiveSession(session)) {
+    throw new Error(DEMO_READONLY_MESSAGE);
+  }
+};
+
+export const assertSessionDownloadable = (session: Pick<ArchiveSession, 'userId'>): void => {
+  if (isDemoArchiveSession(session)) {
+    throw new Error(DEMO_DOWNLOAD_MESSAGE);
+  }
+};
+
+export const assertAuthenticatedWritable = (event: H3Event): ArchiveSession => {
+  const session = assertAuthenticated(event);
+  assertSessionWritable(session);
+  return session;
+};
+
+export const assertAuthenticatedDownloadable = (event: H3Event): ArchiveSession => {
+  const session = assertAuthenticated(event);
+  assertSessionDownloadable(session);
   return session;
 };
 

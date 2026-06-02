@@ -8,7 +8,7 @@ import { getFileAssetById } from '../../../utils/database';
 import { isEditableFileModuleKey, toArchiveModuleKey } from '../../../utils/fileAssetPayload';
 import { createStoredFileResponse, isDownloadRequested } from '../../../utils/fileResponse';
 import { storedFileExists } from '../../../utils/fileStorage';
-import { assertAuthenticated, assertQueryUserId } from '../../../utils/security';
+import { assertAuthenticated, assertQueryUserId, assertSessionDownloadable } from '../../../utils/security';
 
 export default defineEventHandler((event) => {
   try {
@@ -39,6 +39,11 @@ export default defineEventHandler((event) => {
 
     const query = getQuery(event);
     const download = isDownloadRequested(query.download);
+
+    if (download) {
+      assertSessionDownloadable(session);
+    }
+
     return createStoredFileResponse(event, file, download, 'file');
   } catch (error: unknown) {
     console.error(getErrorMessage(error));

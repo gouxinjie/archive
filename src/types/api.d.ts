@@ -37,6 +37,12 @@ export interface AuthStatusData {
   profileId?: string | null;
   /** 类型：字符串或 null；含义：当前档案名称；是否必填：否；默认值：null */
   profileName?: string | null;
+  /** 类型：布尔值；含义：当前账号是否为 demo 演示账号；是否必填：否；默认值：false */
+  isDemoAccount?: boolean;
+  /** 类型：布尔值；含义：当前账号是否处于只读模式；是否必填：否；默认值：false */
+  readOnly?: boolean;
+  /** 类型：字符串或 null；含义：只读模式提示文案；是否必填：否；默认值：null */
+  readOnlyMessage?: string | null;
 }
 
 export interface CsrfTokenData {

@@ -13,7 +13,7 @@ import {
   writeBinaryTempFile
 } from '../../utils/fileStorage';
 import { parseResumeUpdateForm } from '../../utils/resumePayload';
-import { assertAuthenticated, assertCsrfToken } from '../../utils/security';
+import { assertAuthenticatedWritable, assertCsrfToken } from '../../utils/security';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
     }
 
     const formData = await readMultipartFormData(event);
-    const session = assertAuthenticated(event);
+    const session = assertAuthenticatedWritable(event);
     const existingResume = getFileAssetById(session.profileId, 'resumes', id);
 
     if (!existingResume) {

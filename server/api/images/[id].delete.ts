@@ -6,7 +6,7 @@ import { defineEventHandler, getRouterParam } from 'h3';
 import { createErrorResponse, createSuccessResponse, getErrorMessage } from '../../utils/apiResponse';
 import { deleteFileAsset, getFileAssetById } from '../../utils/database';
 import { deleteStoredFile } from '../../utils/fileStorage';
-import { assertAuthenticated, assertCsrfToken } from '../../utils/security';
+import { assertAuthenticatedWritable, assertCsrfToken } from '../../utils/security';
 
 export default defineEventHandler((event) => {
   try {
@@ -18,7 +18,7 @@ export default defineEventHandler((event) => {
       return createErrorResponse('IMAGE_ID_REQUIRED', '图片标识不能为空');
     }
 
-    const session = assertAuthenticated(event);
+    const session = assertAuthenticatedWritable(event);
     const existingImage = getFileAssetById(session.profileId, 'images', id);
 
     if (!existingImage) {

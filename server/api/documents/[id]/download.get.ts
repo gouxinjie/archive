@@ -7,7 +7,7 @@ import { createErrorResponse, getErrorMessage } from '../../../utils/apiResponse
 import { getFileAssetById } from '../../../utils/database';
 import { createStoredFileResponse } from '../../../utils/fileResponse';
 import { storedFileExists } from '../../../utils/fileStorage';
-import { assertAuthenticated, assertQueryUserId } from '../../../utils/security';
+import { assertAuthenticatedDownloadable, assertQueryUserId } from '../../../utils/security';
 
 export default defineEventHandler((event) => {
   try {
@@ -19,7 +19,7 @@ export default defineEventHandler((event) => {
       return createErrorResponse('DOCUMENT_ID_REQUIRED', '文档标识不能为空');
     }
 
-    const session = assertAuthenticated(event);
+    const session = assertAuthenticatedDownloadable(event);
     const document = getFileAssetById(session.profileId, 'documents', id);
 
     if (!document) {

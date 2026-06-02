@@ -4,11 +4,18 @@
 
 import { defineEventHandler, getCookie } from 'h3';
 import { createErrorResponse, createSuccessResponse, getErrorMessage } from '../../utils/apiResponse';
-import { hasMasterPassword, isAuthenticated, verifySessionToken } from '../../utils/security';
+import {
+  getSessionReadOnlyMessage,
+  hasMasterPassword,
+  isAuthenticated,
+  isDemoArchiveSession,
+  verifySessionToken
+} from '../../utils/security';
 
 export default defineEventHandler((event) => {
   try {
     const session = verifySessionToken(getCookie(event, 'archive_session'));
+    const readOnlyMessage = getSessionReadOnlyMessage(session);
 
     return createSuccessResponse({
       hasPassword: hasMasterPassword(),
@@ -17,7 +24,10 @@ export default defineEventHandler((event) => {
       username: session?.username || null,
       displayName: session?.displayName || null,
       profileId: session?.profileId || null,
-      profileName: session?.profileName || null
+      profileName: session?.profileName || null,
+      isDemoAccount: isDemoArchiveSession(session),
+      readOnly: Boolean(readOnlyMessage),
+      readOnlyMessage
     });
   } catch (error: unknown) {
     console.error(getErrorMessage(error));

@@ -13,7 +13,7 @@ import {
   replaceStoredFileWithTemp,
   writeBinaryTempFile
 } from '../../../utils/fileStorage';
-import { assertAuthenticated, assertCsrfToken } from '../../../utils/security';
+import { assertAuthenticatedWritable, assertCsrfToken } from '../../../utils/security';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
 
     const archiveModuleKey = toArchiveModuleKey(moduleKey);
     const formData = await readMultipartFormData(event);
-    const session = assertAuthenticated(event);
+    const session = assertAuthenticatedWritable(event);
     const existingFile = getFileAssetById(session.profileId, archiveModuleKey, id);
 
     if (!existingFile) {

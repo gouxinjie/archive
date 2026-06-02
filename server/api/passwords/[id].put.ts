@@ -6,7 +6,7 @@ import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import { createErrorResponse, createSuccessResponse, getErrorMessage } from '../../utils/apiResponse';
 import { getPasswordItemById, updatePasswordItem } from '../../utils/database';
 import { parsePasswordPayload, type PasswordRequestBody } from '../../utils/passwordPayload';
-import { assertAuthenticated, assertCsrfToken } from '../../utils/security';
+import { assertAuthenticatedWritable, assertCsrfToken } from '../../utils/security';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
     }
 
     const body = await readBody<PasswordRequestBody>(event);
-    const session = assertAuthenticated(event);
+    const session = assertAuthenticatedWritable(event);
     const existingItem = getPasswordItemById(id, session.profileId);
 
     if (!existingItem) {

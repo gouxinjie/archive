@@ -215,6 +215,28 @@
     width: 44px;
   }
 
+  &__demo-tip {
+    background: rgba(239, 246, 255, 0.9);
+    border: 1px solid rgba(185, 210, 247, 0.9);
+    border-radius: 12px;
+    margin-bottom: 18px;
+    padding: 12px 14px;
+  }
+
+  &__demo-tip-title {
+    color: #1f4d86;
+    font-size: 13px;
+    font-weight: 700;
+    margin: 0 0 4px;
+  }
+
+  &__demo-tip-text {
+    color: #5f728f;
+    font-size: 12px;
+    line-height: 1.6;
+    margin: 0;
+  }
+
   &__form {
     display: grid;
     gap: 18px;

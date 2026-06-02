@@ -4,7 +4,7 @@
  * @description 个人档案账号登录面板
  * @author Codex
  * @created 2026-05-29
- * @updated 2026-05-31
+ * @updated 2026-06-02
  */
 
 import { computed, ref } from 'vue';
@@ -86,6 +86,11 @@ const submit = (): void => {
             <p class="entry-gate__panel-subtitle">登录你的个人档案</p>
             <span class="entry-gate__wave" aria-hidden="true" />
           </header>
+
+          <div class="entry-gate__demo-tip" role="note" aria-label="演示账号提示">
+            <p class="entry-gate__demo-tip-title">演示账号说明</p>
+            <p class="entry-gate__demo-tip-text">当前默认填充 demo / 123456。登录后仅支持查看，不支持新增、编辑、上传、删除或下载。</p>
+          </div>
 
           <form class="entry-gate__form" @submit.prevent="submit">
             <label class="entry-gate__field">

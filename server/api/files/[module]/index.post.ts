@@ -13,7 +13,7 @@ import {
   replaceStoredFileWithTemp,
   writeBinaryTempFile
 } from '../../../utils/fileStorage';
-import { assertAuthenticated, assertCsrfToken } from '../../../utils/security';
+import { assertAuthenticatedWritable, assertCsrfToken } from '../../../utils/security';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
       return createErrorResponse('FILE_MODULE_INVALID', '当前模块不支持文件上传');
     }
 
-    const session = assertAuthenticated(event);
+    const session = assertAuthenticatedWritable(event);
     const formData = await readMultipartFormData(event);
     const payload = parseGenericFileUploadForm(moduleKey, formData);
     const id = randomUUID();

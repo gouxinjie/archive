@@ -7,7 +7,7 @@ import { createErrorResponse, getErrorMessage } from '../../utils/apiResponse';
 import { getFileAssetById } from '../../utils/database';
 import { createStoredFileResponse, isDownloadRequested } from '../../utils/fileResponse';
 import { storedFileExists } from '../../utils/fileStorage';
-import { assertAuthenticated, assertQueryUserId } from '../../utils/security';
+import { assertAuthenticated, assertQueryUserId, assertSessionDownloadable } from '../../utils/security';
 
 export default defineEventHandler((event) => {
   try {
@@ -36,6 +36,11 @@ export default defineEventHandler((event) => {
 
     const query = getQuery(event);
     const download = isDownloadRequested(query.download);
+
+    if (download) {
+      assertSessionDownloadable(session);
+    }
+
     return createStoredFileResponse(event, image, download, 'image');
   } catch (error: unknown) {
     console.error(getErrorMessage(error));

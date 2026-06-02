@@ -88,6 +88,10 @@ interface ModuleDetailShellProps {
   errorMessage?: string;
   /** 类型：字符串；含义：当前用户展示名称；是否必填：否；默认值：空字符串 */
   userName?: string;
+  /** 类型：布尔值；含义：当前账号是否为只读模式；是否必填：否；默认值：false */
+  readOnly?: boolean;
+  /** 类型：字符串；含义：只读模式提示文案；是否必填：否；默认值：空字符串 */
+  readOnlyMessage?: string;
   /** 类型：布尔值；含义：密码增删改操作是否执行中；是否必填：否；默认值：false */
   passwordOperationLoading?: boolean;
   /** 类型：字符串；含义：密码弹窗内操作错误提示；是否必填：否；默认值：空字符串 */
@@ -189,6 +193,8 @@ interface GenericFileFormState {
 const props = withDefaults(defineProps<ModuleDetailShellProps>(), {
   errorMessage: '',
   userName: '',
+  readOnly: false,
+  readOnlyMessage: '',
   passwordOperationLoading: false,
   passwordOperationError: '',
   passwordSuccessVersion: 0,
@@ -459,6 +465,10 @@ const isImageModule = computed<boolean>(() => props.module.key === 'images');
 const isCertificateModule = computed<boolean>(() => props.module.key === 'certificates');
 const isStudyModule = computed<boolean>(() => props.module.key === 'study');
 const isEditableFileModule = computed<boolean>(() => isCertificateModule.value || isStudyModule.value);
+const isArchiveReadOnly = computed<boolean>(() => props.readOnly);
+const resolvedReadOnlyMessage = computed<string>(() => {
+  return props.readOnlyMessage.trim() || '演示账号仅支持查看，不支持新增、编辑、上传、删除或下载。';
+});
 const isPasswordDialogReadonly = computed<boolean>(() => passwordDialogMode.value === 'view');
 const isDocumentDialogReadonly = computed<boolean>(() => documentDialogMode.value === 'view');
 const passwordDialogTitle = computed<string>(() => {
@@ -546,6 +556,15 @@ const defaultFileCategory = computed<string>(() => {
 const userAvatarText = computed<string>(() => {
   return props.userName.trim().slice(0, 1).toUpperCase() || 'A';
 });
+
+const shouldBlockReadOnlyAction = (): boolean => {
+  if (!isArchiveReadOnly.value) {
+    return false;
+  }
+
+  ElMessage.warning(resolvedReadOnlyMessage.value);
+  return true;
+};
 
 const passwordItems = computed<PasswordListItem[]>(() => {
   if (!isPasswordModule.value) {
@@ -1150,6 +1169,10 @@ const triggerFileDownload = (url: string, fileName: string): void => {
  * @throws 不主动抛出异常
  */
 const downloadDocument = (item: DocumentListItem): void => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   triggerFileDownload(buildDocumentDownloadUrl(item.id), item.originalName);
 };
 
@@ -1159,6 +1182,10 @@ const downloadDocument = (item: DocumentListItem): void => {
  * @throws 不主动抛出异常
  */
 const downloadCurrentDocument = (): void => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   if (!documentForm.value.id) {
     return;
   }
@@ -1196,6 +1223,10 @@ const handleUserMenuCommand = (command: UserMenuCommand): void => {
 };
 
 const openCreatePasswordDrawer = (): void => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   passwordDialogMode.value = 'create';
   passwordFormError.value = '';
   passwordSubmitAttempted.value = false;
@@ -1239,6 +1270,10 @@ const openViewPasswordDrawer = (item: PasswordListItem): void => {
 };
 
 const switchPasswordDialogToEdit = (): void => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   passwordDialogMode.value = 'edit';
   passwordFormError.value = '';
   passwordSubmitAttempted.value = false;
@@ -1261,7 +1296,7 @@ const normalizePasswordForm = (): void => {
 };
 
 const submitPasswordForm = async (): Promise<void> => {
-  if (isPasswordDialogReadonly.value || props.passwordOperationLoading) {
+  if (isArchiveReadOnly.value || isPasswordDialogReadonly.value || props.passwordOperationLoading) {
     return;
   }
 
@@ -1292,7 +1327,7 @@ const submitPasswordForm = async (): Promise<void> => {
 };
 
 const requestDeletePassword = (id: string): void => {
-  if (!props.passwordOperationLoading) {
+  if (!props.passwordOperationLoading && !isArchiveReadOnly.value) {
     emit('deletePassword', id);
   }
 };
@@ -1303,7 +1338,7 @@ const requestDeletePassword = (id: string): void => {
  * @throws 不主动抛出异常
  */
 const confirmDeletePassword = async (): Promise<void> => {
-  if (!passwordForm.value.id || props.passwordOperationLoading) {
+  if (shouldBlockReadOnlyAction() || !passwordForm.value.id || props.passwordOperationLoading) {
     return;
   }
 
@@ -1423,6 +1458,10 @@ const applyUploadedDocumentFile = async (file: File): Promise<void> => {
  * @throws 不主动抛出异常
  */
 const handleDocumentFilesSelected = async (files: File[]): Promise<void> => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   const firstFile = files[0];
 
   if (!firstFile) {
@@ -1433,6 +1472,10 @@ const handleDocumentFilesSelected = async (files: File[]): Promise<void> => {
 };
 
 const openCreateDocumentDialog = (): void => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   documentDialogMode.value = 'create';
   documentEditorMode.value = 'write';
   documentFormError.value = '';
@@ -1492,6 +1535,10 @@ const openViewDocumentDialog = async (item: DocumentListItem): Promise<void> => 
 };
 
 const openEditDocumentDialog = async (item: DocumentListItem): Promise<void> => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   documentDialogMode.value = 'edit';
   documentEditorMode.value = 'write';
   documentFormError.value = '';
@@ -1502,6 +1549,10 @@ const openEditDocumentDialog = async (item: DocumentListItem): Promise<void> => 
 };
 
 const switchDocumentDialogToEdit = (): void => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   documentDialogMode.value = 'edit';
   documentEditorMode.value = 'write';
   documentFormError.value = '';
@@ -1516,7 +1567,7 @@ const closeDocumentDialog = (): void => {
 };
 
 const submitDocumentForm = async (): Promise<void> => {
-  if (isDocumentDialogReadonly.value || props.documentOperationLoading || documentContentLoading.value) {
+  if (isArchiveReadOnly.value || isDocumentDialogReadonly.value || props.documentOperationLoading || documentContentLoading.value) {
     return;
   }
 
@@ -1540,7 +1591,7 @@ const submitDocumentForm = async (): Promise<void> => {
 };
 
 const requestDeleteDocument = (id: string): void => {
-  if (!props.documentOperationLoading) {
+  if (!props.documentOperationLoading && !isArchiveReadOnly.value) {
     emit('deleteDocument', id);
   }
 };
@@ -1551,7 +1602,7 @@ const requestDeleteDocument = (id: string): void => {
  * @throws 不主动抛出异常
  */
 const confirmDeleteDocument = async (): Promise<void> => {
-  if (!documentForm.value.id || props.documentOperationLoading) {
+  if (shouldBlockReadOnlyAction() || !documentForm.value.id || props.documentOperationLoading) {
     return;
   }
 
@@ -1641,6 +1692,10 @@ const applyUploadedResumeFile = (file: File): void => {
  * @throws 不主动抛出异常
  */
 const handleResumeFilesSelected = (files: File[]): void => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   const firstFile = files[0];
 
   if (!firstFile) {
@@ -1651,6 +1706,10 @@ const handleResumeFilesSelected = (files: File[]): void => {
 };
 
 const openCreateResumeDialog = (): void => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   resumeDialogMode.value = 'create';
   resumeFormError.value = '';
   resumeSubmitAttempted.value = false;
@@ -1665,6 +1724,10 @@ const openCreateResumeDialog = (): void => {
 };
 
 const openEditResumeDialog = (item: FileAssetListItem): void => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   resumeDialogMode.value = 'edit';
   resumeFormError.value = '';
   resumeSubmitAttempted.value = false;
@@ -1686,7 +1749,7 @@ const closeResumeDialog = (): void => {
 };
 
 const submitResumeForm = async (): Promise<void> => {
-  if (props.resumeOperationLoading) {
+  if (isArchiveReadOnly.value || props.resumeOperationLoading) {
     return;
   }
 
@@ -1780,7 +1843,7 @@ const openResumeFile = async (item: FileAssetListItem): Promise<void> => {
  * @throws 不主动抛出异常
  */
 const confirmDeleteResume = async (item: FileAssetListItem): Promise<void> => {
-  if (props.resumeOperationLoading) {
+  if (shouldBlockReadOnlyAction() || props.resumeOperationLoading) {
     return;
   }
 
@@ -1805,7 +1868,7 @@ const confirmDeleteResume = async (item: FileAssetListItem): Promise<void> => {
 const confirmDeleteCurrentResume = async (): Promise<void> => {
   const resumeId = resumeForm.value.id;
 
-  if (!resumeId || props.resumeOperationLoading) {
+  if (shouldBlockReadOnlyAction() || !resumeId || props.resumeOperationLoading) {
     return;
   }
 
@@ -1886,6 +1949,10 @@ const applyUploadedImageFile = (file: File): void => {
  * @throws 不主动抛出异常
  */
 const handleImageFilesSelected = (files: File[]): void => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   const firstFile = files[0];
 
   if (!firstFile) {
@@ -1902,6 +1969,10 @@ const handleImageFilesSelected = (files: File[]): void => {
  * @throws 不抛出异常
  */
 const openCreateImageDialog = (category?: string): void => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   const targetCategory = typeof category === 'string' ? category : '';
   const defaultCategory = targetCategory || (activeCategory.value !== allCategoryLabel ? activeCategory.value : '证件照');
 
@@ -1919,6 +1990,10 @@ const openCreateImageDialog = (category?: string): void => {
 };
 
 const openEditImageDialog = (item: FileAssetListItem): void => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   imagePreviewDialogVisible.value = false;
   imageDialogMode.value = 'edit';
   imageFormError.value = '';
@@ -1941,7 +2016,7 @@ const closeImageDialog = (): void => {
 };
 
 const submitImageForm = async (): Promise<void> => {
-  if (props.imageOperationLoading) {
+  if (isArchiveReadOnly.value || props.imageOperationLoading) {
     return;
   }
 
@@ -2001,6 +2076,10 @@ const closeImagePreviewDialog = (): void => {
  * @throws 不主动抛出异常
  */
 const downloadImage = (item: FileAssetListItem): void => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   if (!isImagePreviewable(item)) {
     ElMessage.error('当前文件不是可下载图片，请重新上传图片文件');
     return;
@@ -2016,7 +2095,7 @@ const downloadImage = (item: FileAssetListItem): void => {
  * @throws 不主动抛出异常
  */
 const confirmDeleteImage = async (item: FileAssetListItem): Promise<void> => {
-  if (props.imageOperationLoading) {
+  if (shouldBlockReadOnlyAction() || props.imageOperationLoading) {
     return;
   }
 
@@ -2041,7 +2120,7 @@ const confirmDeleteImage = async (item: FileAssetListItem): Promise<void> => {
 const confirmDeleteCurrentImage = async (): Promise<void> => {
   const imageId = imageForm.value.id;
 
-  if (!imageId || props.imageOperationLoading) {
+  if (shouldBlockReadOnlyAction() || !imageId || props.imageOperationLoading) {
     return;
   }
 
@@ -2133,6 +2212,10 @@ const applyUploadedGenericFile = (file: File): void => {
  * @throws 不主动抛出异常
  */
 const handleGenericFilesSelected = (files: File[]): void => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   const firstFile = files[0];
 
   if (!firstFile) {
@@ -2149,6 +2232,10 @@ const handleGenericFilesSelected = (files: File[]): void => {
  * @throws 不抛出异常
  */
 const openCreateFileDialog = (category?: string): void => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   const targetCategory = typeof category === 'string' ? category : '';
 
   fileDialogMode.value = 'create';
@@ -2171,6 +2258,10 @@ const openCreateFileDialog = (category?: string): void => {
  * @throws 不抛出异常
  */
 const openEditFileDialog = (item: FileAssetListItem): void => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   fileDialogMode.value = 'edit';
   fileFormError.value = '';
   fileSubmitAttempted.value = false;
@@ -2202,7 +2293,7 @@ const closeFileDialog = (): void => {
  * @throws 表单校验异常由 Element Plus 处理
  */
 const submitFileForm = async (): Promise<void> => {
-  if (props.fileOperationLoading || !isEditableFileModule.value) {
+  if (isArchiveReadOnly.value || props.fileOperationLoading || !isEditableFileModule.value) {
     return;
   }
 
@@ -2240,6 +2331,10 @@ const submitFileForm = async (): Promise<void> => {
  * @throws 不主动抛出异常
  */
 const downloadFile = (item: FileAssetListItem): void => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   triggerFileDownload(buildStoredFileUrl(item, true), item.originalName);
 };
 
@@ -2267,6 +2362,10 @@ const openGenericImagePreviewDialog = (item: FileAssetListItem): void => {
  * @throws 不主动抛出异常
  */
 const openEditPreviewImageDialog = (item: FileAssetListItem): void => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
   if (previewImageSource.value === 'files') {
     closeImagePreviewDialog();
     openEditFileDialog(item);
@@ -2283,7 +2382,7 @@ const openEditPreviewImageDialog = (item: FileAssetListItem): void => {
  * @throws 不主动抛出异常
  */
 const confirmDeleteFile = async (item: FileAssetListItem): Promise<void> => {
-  if (props.fileOperationLoading) {
+  if (shouldBlockReadOnlyAction() || props.fileOperationLoading) {
     return;
   }
 
@@ -2313,7 +2412,7 @@ const confirmDeleteFile = async (item: FileAssetListItem): Promise<void> => {
 const confirmDeleteCurrentFile = async (): Promise<void> => {
   const fileId = fileForm.value.id;
 
-  if (!fileId || props.fileOperationLoading || !isEditableFileModule.value) {
+  if (shouldBlockReadOnlyAction() || !fileId || props.fileOperationLoading || !isEditableFileModule.value) {
     return;
   }
 
@@ -2560,6 +2659,14 @@ watch(
             </div>
             <p class="module-detail__description">{{ props.module.description }}</p>
           </div>
+          <el-alert
+            v-if="isArchiveReadOnly"
+            class="module-detail__readonly-alert"
+            :title="resolvedReadOnlyMessage"
+            type="warning"
+            show-icon
+            :closable="false"
+          />
         </div>
 
         <div class="module-detail__workspace-toolbar">
@@ -2588,7 +2695,7 @@ watch(
               <AppButton type="submit" :loading="props.loading">搜索</AppButton>
             </form>
             <AppButton
-              v-if="isPasswordModule"
+              v-if="isPasswordModule && !isArchiveReadOnly"
               variant="secondary"
               @click="openCreatePasswordDrawer"
             >
@@ -2596,7 +2703,7 @@ watch(
               新增密码
             </AppButton>
             <AppButton
-              v-if="isDocumentModule"
+              v-if="isDocumentModule && !isArchiveReadOnly"
               variant="secondary"
               @click="openCreateDocumentDialog"
             >
@@ -2604,7 +2711,7 @@ watch(
               新增文档
             </AppButton>
             <AppButton
-              v-if="isResumeModule"
+              v-if="isResumeModule && !isArchiveReadOnly"
               variant="secondary"
               @click="openCreateResumeDialog"
             >
@@ -2612,7 +2719,7 @@ watch(
               上传简历
             </AppButton>
             <AppButton
-              v-if="isImageModule"
+              v-if="isImageModule && !isArchiveReadOnly"
               variant="secondary"
               @click="openCreateImageDialog()"
             >
@@ -2620,7 +2727,7 @@ watch(
               上传图片
             </AppButton>
             <AppButton
-              v-if="isEditableFileModule"
+              v-if="isEditableFileModule && !isArchiveReadOnly"
               variant="secondary"
               @click="openCreateFileDialog()"
             >
@@ -2711,8 +2818,8 @@ watch(
 
                       <span class="module-detail__document-actions">
                         <el-button class="module-detail__document-action" text @click="openViewDocumentDialog(item)">查看</el-button>
-                        <el-button class="module-detail__document-action" text @click="downloadDocument(item)">下载</el-button>
-                        <el-button class="module-detail__document-action" type="primary" text @click="openEditDocumentDialog(item)">编辑</el-button>
+                        <el-button v-if="!isArchiveReadOnly" class="module-detail__document-action" text @click="downloadDocument(item)">下载</el-button>
+                        <el-button v-if="!isArchiveReadOnly" class="module-detail__document-action" type="primary" text @click="openEditDocumentDialog(item)">编辑</el-button>
                       </span>
                     </article>
                   </TransitionGroup>
@@ -2762,8 +2869,8 @@ watch(
                         >
                           预览
                         </el-button>
-                        <el-button class="module-detail__resume-action" type="primary" text @click="openEditResumeDialog(item)">编辑</el-button>
-                        <el-button class="module-detail__resume-action" type="danger" text @click="confirmDeleteResume(item)">删除</el-button>
+                        <el-button v-if="!isArchiveReadOnly" class="module-detail__resume-action" type="primary" text @click="openEditResumeDialog(item)">编辑</el-button>
+                        <el-button v-if="!isArchiveReadOnly" class="module-detail__resume-action" type="danger" text @click="confirmDeleteResume(item)">删除</el-button>
                       </span>
                     </article>
                   </TransitionGroup>
@@ -2817,19 +2924,20 @@ watch(
                         <el-button class="module-detail__image-action" text aria-label="预览图片" @click="openImagePreviewDialog(item)">
                           <el-icon><View /></el-icon>
                         </el-button>
-                        <el-button class="module-detail__image-action" text aria-label="下载图片" @click="downloadImage(item)">
+                        <el-button v-if="!isArchiveReadOnly" class="module-detail__image-action" text aria-label="下载图片" @click="downloadImage(item)">
                           <el-icon><Download /></el-icon>
                         </el-button>
-                        <el-button class="module-detail__image-action" type="primary" text aria-label="编辑图片" @click="openEditImageDialog(item)">
+                        <el-button v-if="!isArchiveReadOnly" class="module-detail__image-action" type="primary" text aria-label="编辑图片" @click="openEditImageDialog(item)">
                           <el-icon><EditPen /></el-icon>
                         </el-button>
-                        <el-button class="module-detail__image-action" type="danger" text aria-label="删除图片" @click="confirmDeleteImage(item)">
+                        <el-button v-if="!isArchiveReadOnly" class="module-detail__image-action" type="danger" text aria-label="删除图片" @click="confirmDeleteImage(item)">
                           <el-icon><Delete /></el-icon>
                         </el-button>
                       </div>
                     </article>
 
                     <button
+                      v-if="!isArchiveReadOnly"
                       :key="`upload-${group.name}`"
                       class="module-detail__image-upload-card"
                       type="button"
@@ -2868,15 +2976,15 @@ watch(
                       <span>{{ formatSize(item.size) }}</span>
                       <span>{{ formatUpdatedAt(item.updatedAt) }}</span>
                     </div>
-                    <div v-if="isEditableFileModule" class="module-detail__file-actions">
+                    <div v-if="isEditableFileModule && (isImagePreviewable(item) || !isArchiveReadOnly)" class="module-detail__file-actions">
                       <el-button v-if="isImagePreviewable(item)" class="module-detail__file-action" text @click="openGenericImagePreviewDialog(item)">预览</el-button>
-                      <el-button class="module-detail__file-action" text @click="downloadFile(item)">下载</el-button>
-                      <el-button class="module-detail__file-action" type="primary" text @click="openEditFileDialog(item)">编辑</el-button>
-                      <el-button class="module-detail__file-action" type="danger" text @click="confirmDeleteFile(item)">删除</el-button>
+                      <el-button v-if="!isArchiveReadOnly" class="module-detail__file-action" text @click="downloadFile(item)">下载</el-button>
+                      <el-button v-if="!isArchiveReadOnly" class="module-detail__file-action" type="primary" text @click="openEditFileDialog(item)">编辑</el-button>
+                      <el-button v-if="!isArchiveReadOnly" class="module-detail__file-action" type="danger" text @click="confirmDeleteFile(item)">删除</el-button>
                     </div>
                   </article>
                   <button
-                    v-if="isEditableFileModule"
+                    v-if="isEditableFileModule && !isArchiveReadOnly"
                     :key="`upload-${group.name}`"
                     class="module-detail__file-upload-row"
                     type="button"
@@ -3062,7 +3170,7 @@ watch(
       <template #footer>
         <div class="module-detail__drawer-actions">
           <el-button
-            v-if="isPasswordDialogReadonly && passwordForm.id"
+            v-if="isPasswordDialogReadonly && passwordForm.id && !isArchiveReadOnly"
             type="danger"
             text
             :loading="props.passwordOperationLoading"
@@ -3071,13 +3179,13 @@ watch(
             <el-icon><Delete /></el-icon>
             删除
           </el-button>
-          <el-button v-if="isPasswordDialogReadonly" type="primary" text @click="switchPasswordDialogToEdit">
+          <el-button v-if="isPasswordDialogReadonly && !isArchiveReadOnly" type="primary" text @click="switchPasswordDialogToEdit">
             <el-icon><EditPen /></el-icon>
             编辑
           </el-button>
-          <el-button @click="closePasswordDrawer">{{ isPasswordDialogReadonly ? '关闭' : '取消' }}</el-button>
+          <el-button @click="closePasswordDrawer">{{ isPasswordDialogReadonly || isArchiveReadOnly ? '关闭' : '取消' }}</el-button>
           <el-button
-            v-if="!isPasswordDialogReadonly"
+            v-if="!isPasswordDialogReadonly && !isArchiveReadOnly"
             type="primary"
             :loading="props.passwordOperationLoading"
             @click="submitPasswordForm"
@@ -3265,7 +3373,7 @@ watch(
       <template #footer>
         <div class="module-detail__drawer-actions">
           <el-button
-            v-if="isDocumentDialogReadonly && documentForm.id"
+            v-if="isDocumentDialogReadonly && documentForm.id && !isArchiveReadOnly"
             text
             @click="downloadCurrentDocument"
           >
@@ -3273,7 +3381,7 @@ watch(
             下载
           </el-button>
           <el-button
-            v-if="isDocumentDialogReadonly && documentForm.id"
+            v-if="isDocumentDialogReadonly && documentForm.id && !isArchiveReadOnly"
             type="danger"
             text
             :loading="props.documentOperationLoading"
@@ -3282,13 +3390,13 @@ watch(
             <el-icon><Delete /></el-icon>
             删除
           </el-button>
-          <el-button v-if="isDocumentDialogReadonly" type="primary" text @click="switchDocumentDialogToEdit">
+          <el-button v-if="isDocumentDialogReadonly && !isArchiveReadOnly" type="primary" text @click="switchDocumentDialogToEdit">
             <el-icon><EditPen /></el-icon>
             编辑
           </el-button>
-          <el-button @click="closeDocumentDialog">{{ isDocumentDialogReadonly ? '关闭' : '取消' }}</el-button>
+          <el-button @click="closeDocumentDialog">{{ isDocumentDialogReadonly || isArchiveReadOnly ? '关闭' : '取消' }}</el-button>
           <el-button
-            v-if="!isDocumentDialogReadonly"
+            v-if="!isDocumentDialogReadonly && !isArchiveReadOnly"
             type="primary"
             :loading="props.documentOperationLoading || documentContentLoading"
             @click="submitDocumentForm"
@@ -3407,7 +3515,7 @@ watch(
       <template #footer>
         <div class="module-detail__drawer-actions">
           <el-button
-            v-if="resumeDialogMode === 'edit' && resumeForm.id"
+            v-if="resumeDialogMode === 'edit' && resumeForm.id && !isArchiveReadOnly"
             type="danger"
             text
             :loading="props.resumeOperationLoading"
@@ -3415,8 +3523,9 @@ watch(
           >
             删除文件
           </el-button>
-          <el-button @click="closeResumeDialog">取消</el-button>
+          <el-button @click="closeResumeDialog">{{ isArchiveReadOnly ? '关闭' : '取消' }}</el-button>
           <el-button
+            v-if="!isArchiveReadOnly"
             type="primary"
             :loading="props.resumeOperationLoading"
             @click="submitResumeForm"
@@ -3535,7 +3644,7 @@ watch(
       <template #footer>
         <div class="module-detail__drawer-actions">
           <el-button
-            v-if="imageDialogMode === 'edit' && imageForm.id"
+            v-if="imageDialogMode === 'edit' && imageForm.id && !isArchiveReadOnly"
             type="danger"
             text
             :loading="props.imageOperationLoading"
@@ -3543,8 +3652,9 @@ watch(
           >
             删除图片
           </el-button>
-          <el-button @click="closeImageDialog">取消</el-button>
+          <el-button @click="closeImageDialog">{{ isArchiveReadOnly ? '关闭' : '取消' }}</el-button>
           <el-button
+            v-if="!isArchiveReadOnly"
             type="primary"
             :loading="props.imageOperationLoading"
             @click="submitImageForm"
@@ -3663,7 +3773,7 @@ watch(
       <template #footer>
         <div class="module-detail__drawer-actions">
           <el-button
-            v-if="fileDialogMode === 'edit' && fileForm.id"
+            v-if="fileDialogMode === 'edit' && fileForm.id && !isArchiveReadOnly"
             type="danger"
             text
             :loading="props.fileOperationLoading"
@@ -3671,8 +3781,9 @@ watch(
           >
             删除文件
           </el-button>
-          <el-button @click="closeFileDialog">取消</el-button>
+          <el-button @click="closeFileDialog">{{ isArchiveReadOnly ? '关闭' : '取消' }}</el-button>
           <el-button
+            v-if="!isArchiveReadOnly"
             type="primary"
             :loading="props.fileOperationLoading"
             @click="submitFileForm"
@@ -3719,11 +3830,11 @@ watch(
 
       <template #footer>
         <div class="module-detail__drawer-actions">
-          <el-button v-if="previewImageItem" @click="downloadImage(previewImageItem)">
+          <el-button v-if="previewImageItem && !isArchiveReadOnly" @click="downloadImage(previewImageItem)">
             <el-icon><Download /></el-icon>
             下载
           </el-button>
-          <el-button v-if="previewImageItem" type="primary" @click="openEditPreviewImageDialog(previewImageItem)">
+          <el-button v-if="previewImageItem && !isArchiveReadOnly" type="primary" @click="openEditPreviewImageDialog(previewImageItem)">
             编辑
           </el-button>
           <el-button @click="closeImagePreviewDialog">关闭</el-button>

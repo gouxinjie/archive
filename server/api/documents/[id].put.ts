@@ -14,7 +14,7 @@ import {
   replaceDocumentWithTemp,
   writeDocumentTempContent
 } from '../../utils/documentStorage';
-import { assertAuthenticated, assertCsrfToken } from '../../utils/security';
+import { assertAuthenticatedWritable, assertCsrfToken } from '../../utils/security';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
     }
 
     const body = await readBody<DocumentRequestBody>(event);
-    const session = assertAuthenticated(event);
+    const session = assertAuthenticatedWritable(event);
     const existingDocument = getFileAssetById(session.profileId, 'documents', id);
 
     if (!existingDocument) {

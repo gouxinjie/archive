@@ -7,7 +7,7 @@ import { createErrorResponse, createSuccessResponse, getErrorMessage } from '../
 import { deleteFileAsset, getFileAssetById } from '../../../utils/database';
 import { isEditableFileModuleKey, toArchiveModuleKey } from '../../../utils/fileAssetPayload';
 import { deleteStoredFile } from '../../../utils/fileStorage';
-import { assertAuthenticated, assertCsrfToken } from '../../../utils/security';
+import { assertAuthenticatedWritable, assertCsrfToken } from '../../../utils/security';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
     }
 
     const archiveModuleKey = toArchiveModuleKey(moduleKey);
-    const session = assertAuthenticated(event);
+    const session = assertAuthenticatedWritable(event);
     const existingFile = getFileAssetById(session.profileId, archiveModuleKey, id);
 
     if (!existingFile) {

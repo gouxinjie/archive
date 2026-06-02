@@ -13,13 +13,13 @@ import {
   writeBinaryTempFile
 } from '../../utils/fileStorage';
 import { parseResumeUploadForm } from '../../utils/resumePayload';
-import { assertAuthenticated, assertCsrfToken } from '../../utils/security';
+import { assertAuthenticatedWritable, assertCsrfToken } from '../../utils/security';
 
 export default defineEventHandler(async (event) => {
   try {
     assertCsrfToken(event);
 
-    const session = assertAuthenticated(event);
+    const session = assertAuthenticatedWritable(event);
     const formData = await readMultipartFormData(event);
     const payload = parseResumeUploadForm(formData);
     const id = randomUUID();

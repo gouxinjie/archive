@@ -77,6 +77,10 @@ let moduleRequestSerial = 0;
 const activeModuleLoadSignature = useState<string>('archive-module-active-load-signature', () => '');
 
 const currentProfileId = computed<string | null>(() => session.status.value.userId || session.status.value.profileId || null);
+const isReadOnlySession = computed<boolean>(() => Boolean(session.status.value.readOnly));
+const readOnlyMessage = computed<string>(() => {
+  return session.status.value.readOnlyMessage || '演示账号仅支持查看，不支持新增、编辑、上传、删除或下载。';
+});
 const currentUserName = computed<string>(() => {
   return (
     session.status.value.displayName ||
@@ -131,6 +135,15 @@ const currentItems = computed<PasswordListItem[] | DocumentListItem[] | FileAsse
 
   return [];
 });
+
+const blockReadOnlyAction = (): boolean => {
+  if (!isReadOnlySession.value) {
+    return false;
+  }
+
+  ElMessage.warning(readOnlyMessage.value);
+  return true;
+};
 
 /**
  * 加载左侧模块统计
@@ -276,6 +289,10 @@ const handleOpenModule = async (targetModuleKey: ArchiveModuleKey): Promise<void
 };
 
 const handleSavePassword = async (payload: PasswordFormPayload): Promise<void> => {
+  if (blockReadOnlyAction()) {
+    return;
+  }
+
   passwordOperationLoading.value = true;
   passwordOperationError.value = '';
   moduleError.value = '';
@@ -317,6 +334,10 @@ const handleSavePassword = async (payload: PasswordFormPayload): Promise<void> =
 };
 
 const handleDeletePassword = async (id: string): Promise<void> => {
+  if (blockReadOnlyAction()) {
+    return;
+  }
+
   passwordOperationLoading.value = true;
   passwordOperationError.value = '';
   moduleError.value = '';
@@ -343,6 +364,10 @@ const handleDeletePassword = async (id: string): Promise<void> => {
 };
 
 const handleSaveDocument = async (payload: DocumentFormPayload): Promise<void> => {
+  if (blockReadOnlyAction()) {
+    return;
+  }
+
   documentOperationLoading.value = true;
   documentOperationError.value = '';
   moduleError.value = '';
@@ -381,6 +406,10 @@ const handleSaveDocument = async (payload: DocumentFormPayload): Promise<void> =
 };
 
 const handleDeleteDocument = async (id: string): Promise<void> => {
+  if (blockReadOnlyAction()) {
+    return;
+  }
+
   documentOperationLoading.value = true;
   documentOperationError.value = '';
   moduleError.value = '';
@@ -407,6 +436,10 @@ const handleDeleteDocument = async (id: string): Promise<void> => {
 };
 
 const handleSaveResume = async (payload: ResumeFormPayload): Promise<void> => {
+  if (blockReadOnlyAction()) {
+    return;
+  }
+
   resumeOperationLoading.value = true;
   resumeOperationError.value = '';
   moduleError.value = '';
@@ -457,6 +490,10 @@ const handleSaveResume = async (payload: ResumeFormPayload): Promise<void> => {
 };
 
 const handleDeleteResume = async (id: string): Promise<void> => {
+  if (blockReadOnlyAction()) {
+    return;
+  }
+
   resumeOperationLoading.value = true;
   resumeOperationError.value = '';
   moduleError.value = '';
@@ -483,6 +520,10 @@ const handleDeleteResume = async (id: string): Promise<void> => {
 };
 
 const handleSaveImage = async (payload: ImageFormPayload): Promise<void> => {
+  if (blockReadOnlyAction()) {
+    return;
+  }
+
   imageOperationLoading.value = true;
   imageOperationError.value = '';
   moduleError.value = '';
@@ -533,6 +574,10 @@ const handleSaveImage = async (payload: ImageFormPayload): Promise<void> => {
 };
 
 const handleDeleteImage = async (id: string): Promise<void> => {
+  if (blockReadOnlyAction()) {
+    return;
+  }
+
   imageOperationLoading.value = true;
   imageOperationError.value = '';
   moduleError.value = '';
@@ -559,6 +604,10 @@ const handleDeleteImage = async (id: string): Promise<void> => {
 };
 
 const handleSaveFile = async (payload: FileAssetFormPayload): Promise<void> => {
+  if (blockReadOnlyAction()) {
+    return;
+  }
+
   fileOperationLoading.value = true;
   fileOperationError.value = '';
   moduleError.value = '';
@@ -609,6 +658,10 @@ const handleSaveFile = async (payload: FileAssetFormPayload): Promise<void> => {
 };
 
 const handleDeleteFile = async (payload: { module: ArchiveModuleKey; id: string }): Promise<void> => {
+  if (blockReadOnlyAction()) {
+    return;
+  }
+
   fileOperationLoading.value = true;
   fileOperationError.value = '';
   moduleError.value = '';
@@ -681,6 +734,8 @@ watch(
     :loading="loading"
     :error-message="moduleError"
     :user-name="currentUserName"
+    :read-only="isReadOnlySession"
+    :read-only-message="readOnlyMessage"
     :password-operation-loading="passwordOperationLoading"
     :password-operation-error="passwordOperationError"
     :password-success-version="passwordSuccessVersion"

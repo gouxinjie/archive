@@ -6,7 +6,7 @@ import { defineEventHandler, getRouterParam } from 'h3';
 import { createErrorResponse, createSuccessResponse, getErrorMessage } from '../../utils/apiResponse';
 import { deleteFileAsset, getFileAssetById } from '../../utils/database';
 import { deleteDocumentContent } from '../../utils/documentStorage';
-import { assertAuthenticated, assertCsrfToken } from '../../utils/security';
+import { assertAuthenticatedWritable, assertCsrfToken } from '../../utils/security';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
       return createErrorResponse('DOCUMENT_ID_REQUIRED', '文档标识不能为空');
     }
 
-    const session = assertAuthenticated(event);
+    const session = assertAuthenticatedWritable(event);
     const existingDocument = getFileAssetById(session.profileId, 'documents', id);
 
     if (!existingDocument) {

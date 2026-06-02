@@ -218,6 +218,8 @@ ECS 推荐部署根目录为：
 公网访问 8081 -> Nginx -> 127.0.0.1:3000 -> Nuxt/PM2
 ```
 
+如果生产环境走 Nginx 反向代理，记得把 `client_max_body_size` 调到至少 `30m`。当前项目支持最大 25MB 的文件上传，multipart 会带上额外边界和表单字段；如果仍使用默认限制，上传 docx、pdf、图片或证件文件时会直接返回 `413 Request Entity Too Large`。
+
 构建生产版本：
 
 ```bash

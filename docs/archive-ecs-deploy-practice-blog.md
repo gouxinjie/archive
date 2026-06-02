@@ -169,6 +169,7 @@ Nginx 配置核心如下：
 server {
   listen 8081;
   server_name _;
+  client_max_body_size 30m;
 
   location / {
     proxy_pass http://127.0.0.1:3000;
@@ -180,6 +181,8 @@ server {
   }
 }
 ```
+
+这里要显式加上 `client_max_body_size 30m;`。项目里简历、图片、证件和学习资料都走 multipart 上传，请求体会比实际文件略大；如果沿用 Nginx 默认限制，上传稍大的 docx、pdf 或图片时会被 Nginx 直接拦截，浏览器收到的就是 `413 Request Entity Too Large`，请求根本到不了 Nuxt。改完后记得重载 Nginx。
 
 ## 六、GitHub Actions 最终负责什么
 

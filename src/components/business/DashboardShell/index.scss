@@ -1,6 +1,6 @@
 /**
  * 文件说明：个人档案首页仪表盘样式
- * 样式说明：定义顶部导航、总览统计、模块入口和上传面板
+ * 样式说明：定义顶部导航、总览统计、模块入口和结构图表面板
  * 关键布局说明：首页保留统一顶部导航，内容区采用总览卡片与双栏工作区
  */
 
@@ -256,8 +256,9 @@
 
   &__main {
     display: grid;
-    gap: $space-3;
+    gap: $space-4;
     margin: 0 auto;
+    padding-top: $space-3;
     max-width: 100%;
     min-width: 0;
     overflow-x: hidden;
@@ -325,15 +326,14 @@
   }
 
   &__workspace {
-    align-items: start;
     display: grid;
     gap: $space-4;
-    grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+    margin-top: $space-1;
     min-width: 0;
   }
 
   &__module-list,
-  &__upload-area {
+  &__insight-panel {
     background: rgba(248, 251, 255, 0.78);
     border: 1px solid $color-border-soft;
     border-radius: $radius-md;
@@ -420,22 +420,264 @@
     text-align: right;
   }
 
-  &__upload-tip {
-    color: $color-accent;
+  &__insight-panel {
+    align-content: start;
+    align-items: start;
+    grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+
+    > .dashboard-shell__section-head,
+    > .dashboard-shell__distribution {
+      grid-column: 1 / -1;
+    }
+  }
+
+  &__ratio-card {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(183, 204, 228, 0.72);
+    border-radius: $radius-sm;
+    display: grid;
+    gap: $space-3;
+    grid-template-columns: 142px minmax(0, 1fr);
+    padding: $space-3;
+  }
+
+  &__ratio-ring {
+    align-items: center;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    display: grid;
+    justify-self: center;
+    padding: 14px;
+    place-items: center;
+    position: relative;
+    width: min(100%, 132px);
+
+    &::after {
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(201, 216, 237, 0.78);
+      border-radius: 50%;
+      content: "";
+      inset: 14px;
+      position: absolute;
+    }
+  }
+
+  &__ratio-ring-inner {
+    display: grid;
+    gap: 2px;
+    place-items: center;
+    position: relative;
+    text-align: center;
+    z-index: 1;
+  }
+
+  &__ratio-ring-total {
+    color: $color-text-main;
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  &__ratio-ring-label {
+    color: $color-text-muted;
+    font-size: 12px;
+  }
+
+  &__ratio-legend {
+    display: grid;
+    gap: $space-2;
+    min-width: 0;
+  }
+
+  &__ratio-item {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(243, 248, 255, 0.92));
+    border: 1px solid rgba(204, 220, 241, 0.72);
+    border-radius: calc($radius-sm - 2px);
+    display: grid;
+    gap: 6px;
+    padding: $space-2;
+  }
+
+  &__ratio-item-head {
+    align-items: center;
+    display: flex;
+    gap: $space-2;
+    justify-content: space-between;
+  }
+
+  &__ratio-item-label {
+    align-items: center;
+    color: $color-text-main;
+    display: inline-flex;
     font-size: 13px;
+    font-weight: 600;
+    gap: $space-2;
+    min-width: 0;
+  }
+
+  &__ratio-item-dot {
+    border-radius: 999px;
+    flex: 0 0 10px;
+    height: 10px;
+    width: 10px;
+
+    &--passwords {
+      background: #2f6bff;
+      box-shadow: 0 0 0 3px rgba(47, 107, 255, 0.14);
+    }
+
+    &--files {
+      background: #16a085;
+      box-shadow: 0 0 0 3px rgba(22, 160, 133, 0.14);
+    }
+  }
+
+  &__ratio-item-value {
+    color: $color-text-main;
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  &__ratio-item-meta {
+    color: $color-text-muted;
+    font-size: 12px;
     line-height: 1.5;
     margin: 0;
   }
 
-  &__upload-area {
-    :deep(.archive-dropzone) {
-      align-items: stretch;
-      flex-direction: column;
-    }
+  &__insight-metrics {
+    display: grid;
+    gap: $space-2;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    height: 100%;
+  }
 
-    :deep(.archive-dropzone__content) {
-      min-width: 0;
-    }
+  &__insight-metric {
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(183, 204, 228, 0.72);
+    border-radius: $radius-sm;
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    padding: $space-3;
+  }
+
+  &__insight-metric-label {
+    color: $color-text-muted;
+    font-size: 12px;
+  }
+
+  &__insight-metric-value {
+    @include text-ellipsis;
+    color: $color-text-main;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 0;
+  }
+
+  &__insight-metric-meta {
+    color: $color-text-muted;
+    font-size: 12px;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  &__distribution {
+    display: grid;
+    gap: $space-3;
+  }
+
+  &__subsection-head {
+    align-items: center;
+    display: flex;
+    gap: $space-3;
+    justify-content: space-between;
+  }
+
+  &__subsection-title {
+    color: $color-text-main;
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  &__subsection-meta {
+    color: $color-text-soft;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  &__distribution-list {
+    display: grid;
+    gap: $space-2;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    list-style: none;
+    margin: 0;
+    min-width: 0;
+    padding: 0;
+  }
+
+  &__distribution-item {
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(191, 208, 231, 0.72);
+    border-radius: $radius-sm;
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    padding: $space-3;
+  }
+
+  &__distribution-top {
+    align-items: center;
+    display: grid;
+    gap: $space-2;
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-width: 0;
+  }
+
+  &__distribution-label {
+    align-items: center;
+    display: flex;
+    gap: $space-2;
+    min-width: 0;
+  }
+
+  &__distribution-name {
+    @include text-ellipsis;
+    color: $color-text-main;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  &__distribution-count {
+    color: $color-text-main;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  &__distribution-track {
+    background: var(--distribution-soft);
+    border-radius: 999px;
+    height: 8px;
+    overflow: hidden;
+  }
+
+  &__distribution-fill {
+    background: var(--distribution-fill);
+    border-radius: 999px;
+    display: block;
+    height: 100%;
+    width: var(--distribution-width);
+  }
+
+  &__distribution-share {
+    color: $color-text-muted;
+    font-size: 12px;
+    line-height: 1.4;
   }
 }
 
@@ -465,9 +707,20 @@
 
 @media (max-width: 1180px) {
   .dashboard-shell {
-    &__overview,
-    &__workspace {
+    &__overview {
       grid-template-columns: 1fr;
+    }
+
+    &__insight-panel,
+    &__distribution-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    &__insight-panel {
+      > .dashboard-shell__section-head,
+      > .dashboard-shell__distribution {
+        grid-column: 1 / -1;
+      }
     }
   }
 }
@@ -511,6 +764,13 @@
       grid-template-columns: 1fr;
     }
 
+    &__ratio-card,
+    &__insight-metrics,
+    &__insight-panel,
+    &__distribution-list {
+      grid-template-columns: 1fr;
+    }
+
     &__module-row {
       align-items: start;
     }
@@ -521,7 +781,7 @@
 
     &__overview,
     &__module-list,
-    &__upload-area {
+    &__insight-panel {
       padding: $space-3;
     }
   }

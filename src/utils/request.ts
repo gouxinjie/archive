@@ -4,6 +4,7 @@
 
 import { useCookie, useRuntimeConfig } from '#app';
 import { $fetch } from 'ofetch';
+import type { IFetchError } from 'ofetch';
 import { DEFAULT_USER_ID } from '~/constants/app';
 import type { ApiResponse, CsrfTokenData } from '~/types/api';
 
@@ -25,6 +26,53 @@ interface ArchiveUploadRequestOptions {
   /** 类型：对象；含义：查询参数；是否必填：否；默认值：undefined */
   query?: Record<string, string | number | boolean | undefined>;
 }
+
+interface ArchiveErrorPayload {
+  /** 类型：字符串；含义：服务端返回的错误提示；是否必填：否；默认值：undefined */
+  message?: string;
+}
+
+const uploadBodyTooLargeMessage =
+  '服务器上传大小限制过小（HTTP 413），请将 Nginx 或其他反向代理的请求体上限调到至少 30MB，例如配置 client_max_body_size 30m; 后再重试。';
+
+/**
+ * 判断是否为 ofetch 抛出的请求错误
+ * @param error - 未知错误对象
+ * @returns 是否为请求错误
+ * @throws 不抛出异常
+ */
+const isArchiveFetchError = (error: unknown): error is IFetchError<ArchiveErrorPayload> => {
+  return typeof error === 'object' && error !== null && ('status' in error || 'statusCode' in error || 'response' in error);
+};
+
+/**
+ * 统一规范请求异常提示
+ * @param error - 未知错误对象
+ * @param fallbackMessage - 默认错误提示
+ * @returns 规范化后的错误对象
+ * @throws 不抛出异常
+ */
+const normalizeRequestError = (error: unknown, fallbackMessage: string): Error => {
+  if (isArchiveFetchError(error)) {
+    const apiMessage = typeof error.data?.message === 'string' ? error.data.message.trim() : '';
+
+    if (apiMessage) {
+      return new Error(apiMessage);
+    }
+
+    const statusCode = error.statusCode || error.status || error.response?.status;
+
+    if (statusCode === 413) {
+      return new Error(uploadBodyTooLargeMessage);
+    }
+  }
+
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error;
+  }
+
+  return new Error(fallbackMessage);
+};
 
 /**
  * 获取单人系统的用户标识
@@ -72,27 +120,35 @@ export const request = async <T>(url: string, options: ArchiveRequestOptions = {
   const userId = getArchiveUserId();
 
   if (method === 'GET') {
-    return $fetch<ApiResponse<T>>(url, {
-      method,
-      query: {
-        userId,
-        ...options.query
-      }
-    });
+    try {
+      return await $fetch<ApiResponse<T>>(url, {
+        method,
+        query: {
+          userId,
+          ...options.query
+        }
+      });
+    } catch (error: unknown) {
+      throw normalizeRequestError(error, '请求失败');
+    }
   }
 
   const csrfToken = await ensureCsrfToken();
 
-  return $fetch<ApiResponse<T>>(url, {
-    method,
-    headers: {
-      'x-csrf-token': csrfToken
-    },
-    body: {
-      userId,
-      ...options.body
-    }
-  });
+  try {
+    return await $fetch<ApiResponse<T>>(url, {
+      method,
+      headers: {
+        'x-csrf-token': csrfToken
+      },
+      body: {
+        userId,
+        ...options.body
+      }
+    });
+  } catch (error: unknown) {
+    throw normalizeRequestError(error, '请求失败');
+  }
 };
 
 /**
@@ -113,12 +169,16 @@ export const uploadRequest = async <T>(url: string, body: FormData, options: Arc
 
   const csrfToken = await ensureCsrfToken();
 
-  return $fetch<ApiResponse<T>>(url, {
-    method,
-    headers: {
-      'x-csrf-token': csrfToken
-    },
-    query: options.query,
-    body
-  });
+  try {
+    return await $fetch<ApiResponse<T>>(url, {
+      method,
+      headers: {
+        'x-csrf-token': csrfToken
+      },
+      query: options.query,
+      body
+    });
+  } catch (error: unknown) {
+    throw normalizeRequestError(error, '文件上传失败');
+  }
 };

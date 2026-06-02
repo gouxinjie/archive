@@ -7,10 +7,9 @@
  * @updated 2026-05-30
  */
 
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { ElDropdown, ElDropdownItem, ElDropdownMenu } from 'element-plus';
 import AppButton from '~/components/commons/AppButton/index.vue';
-import FileDropzone from '~/components/commons/FileDropzone/index.vue';
 import { APP_ENGLISH_NAME, APP_NAME, ARCHIVE_MODULES } from '~/constants/app';
 import type { DashboardSummaryData } from '~/types/api';
 import type { ArchiveModuleConfig, ArchiveModuleKey } from '~/types/models';
@@ -26,6 +25,28 @@ interface DashboardShellProps {
   userName?: string;
 }
 
+interface DashboardTonePalette {
+  /** 类型：字符串；含义：图表柔和底色；是否必填：是；默认值：无 */
+  soft: string;
+  /** 类型：字符串；含义：图表渐变色；是否必填：是；默认值：无 */
+  gradient: string;
+}
+
+interface DashboardDistributionItem {
+  /** 类型：ArchiveModuleKey；含义：模块唯一标识；是否必填：是；默认值：无 */
+  key: ArchiveModuleKey;
+  /** 类型：字符串；含义：模块名称；是否必填：是；默认值：无 */
+  name: string;
+  /** 类型：ArchiveModuleConfig['tone']；含义：模块色调；是否必填：是；默认值：无 */
+  tone: ArchiveModuleConfig['tone'];
+  /** 类型：数字；含义：模块当前数量；是否必填：是；默认值：0 */
+  count: number;
+  /** 类型：字符串；含义：模块占比文案；是否必填：是；默认值：0% */
+  shareLabel: string;
+  /** 类型：记录对象；含义：分布条样式变量；是否必填：是；默认值：空对象 */
+  style: Record<string, string>;
+}
+
 const props = withDefaults(defineProps<DashboardShellProps>(), {
   userName: ''
 });
@@ -35,7 +56,32 @@ const emit = defineEmits<{
   openModule: [moduleKey: ArchiveModuleKey];
 }>();
 
-const selectedFiles = ref<File[]>([]);
+const dashboardTonePalettes: Record<ArchiveModuleConfig['tone'], DashboardTonePalette> = {
+  blue: {
+    soft: 'rgba(47, 107, 255, 0.14)',
+    gradient: 'linear-gradient(90deg, #2f6bff 0%, #6f9cff 100%)'
+  },
+  cyan: {
+    soft: 'rgba(8, 145, 178, 0.16)',
+    gradient: 'linear-gradient(90deg, #0891b2 0%, #32b7d4 100%)'
+  },
+  indigo: {
+    soft: 'rgba(79, 70, 229, 0.16)',
+    gradient: 'linear-gradient(90deg, #4f46e5 0%, #7c74f1 100%)'
+  },
+  teal: {
+    soft: 'rgba(13, 148, 136, 0.16)',
+    gradient: 'linear-gradient(90deg, #0d9488 0%, #33b6a8 100%)'
+  },
+  sky: {
+    soft: 'rgba(37, 99, 235, 0.16)',
+    gradient: 'linear-gradient(90deg, #2563eb 0%, #5b92ff 100%)'
+  },
+  violet: {
+    soft: 'rgba(124, 58, 237, 0.16)',
+    gradient: 'linear-gradient(90deg, #7c3aed 0%, #9b6df7 100%)'
+  }
+};
 
 const moduleCounts = computed<Record<ArchiveModuleConfig['key'], number>>(() => ({
   passwords: props.summary.passwordCount,
@@ -54,9 +100,69 @@ const userAvatarText = computed<string>(() => {
   return props.userName.trim().slice(0, 1).toUpperCase() || 'A';
 });
 
-const handleFilesSelected = (files: File[]): void => {
-  selectedFiles.value = files;
-};
+const fileArchiveTotal = computed<number>(() => {
+  return archiveTotal.value - moduleCounts.value.passwords;
+});
+
+const passwordShare = computed<number>(() => {
+  if (archiveTotal.value <= 0) {
+    return 0;
+  }
+
+  return Number(((moduleCounts.value.passwords / archiveTotal.value) * 100).toFixed(1));
+});
+
+const fileArchiveShare = computed<number>(() => {
+  if (archiveTotal.value <= 0) {
+    return 0;
+  }
+
+  return Number(((fileArchiveTotal.value / archiveTotal.value) * 100).toFixed(1));
+});
+
+const ratioRingStyle = computed<Record<string, string>>(() => {
+  if (props.loading || archiveTotal.value <= 0) {
+    return {
+      background: 'conic-gradient(#dce7f8 0 100%)'
+    };
+  }
+
+  return {
+    background: `conic-gradient(#2f6bff 0 ${passwordShare.value}%, #16a085 ${passwordShare.value}% 100%)`
+  };
+});
+
+const moduleDistribution = computed<DashboardDistributionItem[]>(() => {
+  const maxCount = Math.max(...ARCHIVE_MODULES.map((module) => moduleCounts.value[module.key]), 0);
+
+  return ARCHIVE_MODULES.map((module) => {
+    const count = moduleCounts.value[module.key];
+    const share = archiveTotal.value > 0 ? (count / archiveTotal.value) * 100 : 0;
+    const barWidth = maxCount > 0 ? (count / maxCount) * 100 : 0;
+    const palette = dashboardTonePalettes[module.tone];
+
+    return {
+      key: module.key,
+      name: module.name,
+      tone: module.tone,
+      count,
+      shareLabel: archiveTotal.value > 0 ? `${share.toFixed(1)}%` : '0%',
+      style: {
+        '--distribution-fill': palette.gradient,
+        '--distribution-soft': palette.soft,
+        '--distribution-width': `${count > 0 ? Math.max(barWidth, 12) : 0}%`
+      }
+    };
+  }).sort((left, right) => right.count - left.count);
+});
+
+const activeModuleCount = computed<number>(() => {
+  return moduleDistribution.value.filter((item) => item.count > 0).length;
+});
+
+const dominantModule = computed<DashboardDistributionItem | null>(() => {
+  return moduleDistribution.value.find((item) => item.count > 0) || null;
+});
 
 const handleOpenModule = (moduleKey: ArchiveModuleKey): void => {
   emit('openModule', moduleKey);
@@ -194,22 +300,115 @@ const handleUserMenuCommand = (command: UserMenuCommand): void => {
           </div>
         </section>
 
-        <aside class="dashboard-shell__upload-area">
+        <aside class="dashboard-shell__insight-panel">
           <header class="dashboard-shell__section-head">
             <div>
-              <p class="dashboard-shell__section-kicker">Upload</p>
-              <h2 class="dashboard-shell__section-title">快速上传</h2>
+              <p class="dashboard-shell__section-kicker">Insights</p>
+              <h2 class="dashboard-shell__section-title">结构概览</h2>
             </div>
+            <span class="dashboard-shell__section-count">
+              {{ props.loading ? '...' : `${activeModuleCount}/${ARCHIVE_MODULES.length} 已使用` }}
+            </span>
           </header>
 
-          <FileDropzone
-            title="拖拽上传"
-            description="拖拽文件到这里，后续会按模块保存到 ECS 本地 uploads 目录"
-            @files-selected="handleFilesSelected"
-          />
-          <p v-if="selectedFiles.length > 0" class="dashboard-shell__upload-tip">
-            已选择 {{ selectedFiles.length }} 个文件，上传接口会在模块 CRUD 阶段接入。
-          </p>
+          <section class="dashboard-shell__ratio-card">
+            <div class="dashboard-shell__ratio-ring" :style="ratioRingStyle">
+              <div class="dashboard-shell__ratio-ring-inner">
+                <strong class="dashboard-shell__ratio-ring-total">
+                  {{ props.loading ? '...' : archiveTotal }}
+                </strong>
+                <span class="dashboard-shell__ratio-ring-label">总归档</span>
+              </div>
+            </div>
+
+            <div class="dashboard-shell__ratio-legend">
+              <article class="dashboard-shell__ratio-item">
+                <div class="dashboard-shell__ratio-item-head">
+                  <span class="dashboard-shell__ratio-item-label">
+                    <span class="dashboard-shell__ratio-item-dot dashboard-shell__ratio-item-dot--passwords" />
+                    密码记录
+                  </span>
+                  <strong class="dashboard-shell__ratio-item-value">
+                    {{ props.loading ? '...' : moduleCounts.passwords }}
+                  </strong>
+                </div>
+                <p class="dashboard-shell__ratio-item-meta">
+                  {{ props.loading ? '占比加载中' : `占全部归档 ${passwordShare}%` }}
+                </p>
+              </article>
+
+              <article class="dashboard-shell__ratio-item">
+                <div class="dashboard-shell__ratio-item-head">
+                  <span class="dashboard-shell__ratio-item-label">
+                    <span class="dashboard-shell__ratio-item-dot dashboard-shell__ratio-item-dot--files" />
+                    文件资料
+                  </span>
+                  <strong class="dashboard-shell__ratio-item-value">
+                    {{ props.loading ? '...' : fileArchiveTotal }}
+                  </strong>
+                </div>
+                <p class="dashboard-shell__ratio-item-meta">
+                  {{ props.loading ? '占比加载中' : `占全部归档 ${fileArchiveShare}%` }}
+                </p>
+              </article>
+            </div>
+          </section>
+
+          <section class="dashboard-shell__insight-metrics" aria-label="首页洞察">
+            <article class="dashboard-shell__insight-metric">
+              <span class="dashboard-shell__insight-metric-label">主力模块</span>
+              <strong class="dashboard-shell__insight-metric-value">
+                {{ props.loading ? '...' : dominantModule?.name || '暂无数据' }}
+              </strong>
+              <p class="dashboard-shell__insight-metric-meta">
+                {{ props.loading ? '模块占比计算中' : dominantModule ? `当前占比 ${dominantModule.shareLabel}` : '录入数据后会自动生成' }}
+              </p>
+            </article>
+
+            <article class="dashboard-shell__insight-metric">
+              <span class="dashboard-shell__insight-metric-label">覆盖模块</span>
+              <strong class="dashboard-shell__insight-metric-value">
+                {{ props.loading ? '...' : `${activeModuleCount} 个` }}
+              </strong>
+              <p class="dashboard-shell__insight-metric-meta">
+                {{ props.loading ? '模块使用情况加载中' : `还有 ${ARCHIVE_MODULES.length - activeModuleCount} 个模块待补充` }}
+              </p>
+            </article>
+          </section>
+
+          <section class="dashboard-shell__distribution" aria-label="模块分布图表">
+            <div class="dashboard-shell__subsection-head">
+              <h3 class="dashboard-shell__subsection-title">模块分布</h3>
+              <span class="dashboard-shell__subsection-meta">
+                {{ props.loading ? '统计中' : '按当前归档数量展示' }}
+              </span>
+            </div>
+
+            <ul class="dashboard-shell__distribution-list">
+              <li
+                v-for="item in moduleDistribution"
+                :key="item.key"
+                class="dashboard-shell__distribution-item"
+                :style="item.style"
+              >
+                <div class="dashboard-shell__distribution-top">
+                  <div class="dashboard-shell__distribution-label">
+                    <span class="dashboard-shell__module-dot" :class="`dashboard-shell__module-dot--${item.tone}`" />
+                    <span class="dashboard-shell__distribution-name">{{ item.name }}</span>
+                  </div>
+                  <strong class="dashboard-shell__distribution-count">
+                    {{ props.loading ? '...' : item.count }}
+                  </strong>
+                </div>
+                <div class="dashboard-shell__distribution-track">
+                  <span class="dashboard-shell__distribution-fill" />
+                </div>
+                <span class="dashboard-shell__distribution-share">
+                  {{ props.loading ? '占比计算中' : `占全部归档 ${item.shareLabel}` }}
+                </span>
+              </li>
+            </ul>
+          </section>
         </aside>
       </section>
     </main>

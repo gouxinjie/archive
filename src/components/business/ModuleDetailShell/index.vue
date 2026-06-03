@@ -2,9 +2,9 @@
 /**
  * @component ModuleDetailShell
  * @description 个人档案模块工作台布局
- * @author Codex
+ * @author gouxinjie
  * @created 2026-05-29
- * @updated 2026-05-30
+ * @updated 2026-06-03
  */
 
 import { computed, ref, watch } from 'vue';
@@ -55,7 +55,7 @@ import {
   PASSWORD_LOGIN_METHOD_OPTION_GROUPS,
   normalizePasswordLoginMethod
 } from '~/constants/passwordLoginMethods';
-import type { DashboardSummaryData, ResumePreviewData } from '~/types/api';
+import type { ApiResponse, DashboardSummaryData, ResumePreviewData } from '~/types/api';
 import type {
   ArchiveModuleConfig,
   ArchiveModuleKey,
@@ -71,6 +71,7 @@ import type {
   ResumeFileType,
   ResumeFormPayload
 } from '~/types/models';
+import { formatSqliteUtcToChinaDateTime } from '~/utils/dateTime';
 import { getArchiveUserId, request } from '~/utils/request';
 
 type UserMenuCommand = 'logout';
@@ -259,6 +260,7 @@ const passwordDialogVisible = ref(false);
 const passwordDialogMode = ref<'create' | 'edit' | 'view'>('create');
 const passwordFormError = ref('');
 const passwordSubmitAttempted = ref(false);
+const passwordExportLoading = ref(false);
 const passwordFormRef = ref<FormInstance>();
 const originalPasswordLoginMethod = ref('');
 const passwordForm = ref<PasswordFormPayload>({
@@ -995,63 +997,6 @@ const getImageExtensionText = (item: FileAssetListItem): string => {
  * @returns 本地时区时间文本，解析失败时返回原值
  * @throws 不抛出异常
  */
-const chinaDateTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
-  timeZone: 'Asia/Shanghai',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-  hourCycle: 'h23'
-});
-
-/**
- * 按中国时区格式化日期对象
- * @param date - Date 实例
- * @returns yyyy-MM-dd HH:mm:ss 格式文本
- * @throws 不抛出异常
- */
-const formatChinaDateTime = (date: Date): string => {
-  let year = '';
-  let month = '';
-  let day = '';
-  let hour = '';
-  let minute = '';
-  let second = '';
-
-  for (const part of chinaDateTimeFormatter.formatToParts(date)) {
-    switch (part.type) {
-      case 'year':
-        year = part.value;
-        break;
-      case 'month':
-        month = part.value;
-        break;
-      case 'day':
-        day = part.value;
-        break;
-      case 'hour':
-        hour = part.value;
-        break;
-      case 'minute':
-        minute = part.value;
-        break;
-      case 'second':
-        second = part.value;
-        break;
-      default:
-        break;
-    }
-  }
-
-  if (!year || !month || !day || !hour || !minute || !second) {
-    return '';
-  }
-
-  return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
-};
-
 /**
  * 将 SQLite 的 UTC 时间字符串格式化为中国时区显示文本
  * @param value - 数据库返回的时间字符串
@@ -1059,32 +1004,7 @@ const formatChinaDateTime = (date: Date): string => {
  * @throws 不抛出异常
  */
 const formatUpdatedAt = (value: string): string => {
-  const normalizedValue = value.trim();
-  const match = normalizedValue.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
-
-  if (!match) {
-    const fallbackDate = new Date(normalizedValue);
-
-    if (Number.isNaN(fallbackDate.getTime())) {
-      return value;
-    }
-
-    const formattedText = formatChinaDateTime(fallbackDate);
-    return formattedText || value;
-  }
-
-  const [, yearText, monthText, dayText, hourText, minuteText, secondText] = match;
-  const date = new Date(Date.UTC(
-    Number(yearText),
-    Number(monthText) - 1,
-    Number(dayText),
-    Number(hourText),
-    Number(minuteText),
-    Number(secondText)
-  ));
-
-  const formattedText = formatChinaDateTime(date);
-  return formattedText || value;
+  return formatSqliteUtcToChinaDateTime(value);
 };
 
 /**
@@ -1160,6 +1080,131 @@ const triggerFileDownload = (url: string, fileName: string): void => {
   window.document.body.appendChild(link);
   link.click();
   link.remove();
+};
+
+/**
+ * 解析响应头中的下载文件名
+ * @param disposition - Content-Disposition 响应头
+ * @returns 文件名或 null
+ * @throws 不抛出异常
+ */
+const extractDownloadFileName = (disposition: string | null): string | null => {
+  if (!disposition) {
+    return null;
+  }
+
+  const encodedNameMatch = disposition.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+
+  if (encodedNameMatch?.[1]) {
+    try {
+      return decodeURIComponent(encodedNameMatch[1]);
+    } catch {
+      return encodedNameMatch[1];
+    }
+  }
+
+  const plainNameMatch = disposition.match(/filename\s*=\s*"([^"]+)"|filename\s*=\s*([^;]+)/i);
+  const rawFileName = plainNameMatch?.[1] || plainNameMatch?.[2];
+
+  if (!rawFileName) {
+    return null;
+  }
+
+  return rawFileName.trim();
+};
+
+/**
+ * 触发浏览器下载 Blob 文件
+ * @param blob - 文件内容
+ * @param fileName - 下载文件名
+ * @returns 无返回值
+ * @throws 不抛出异常
+ */
+const triggerBlobDownload = (blob: Blob, fileName: string): void => {
+  const objectUrl = window.URL.createObjectURL(blob);
+  triggerFileDownload(objectUrl, fileName);
+  window.setTimeout(() => {
+    window.URL.revokeObjectURL(objectUrl);
+  }, 1000);
+};
+
+/**
+ * 导出当前账号下的密码 Excel
+ * @returns 无返回值
+ * @throws 不主动抛出异常
+ */
+const exportPasswords = async (): Promise<void> => {
+  if (shouldBlockReadOnlyAction()) {
+    return;
+  }
+
+  if (passwordExportLoading.value) {
+    return;
+  }
+
+  const passwordCount = props.summary.passwordCount;
+  const confirmMessage = passwordCount > 0
+    ? `导出文件将包含当前账号下的 ${passwordCount} 条敏感密码记录，并按分类拆分到不同 Sheet，确认导出吗？`
+    : '当前没有密码记录，仍会导出一个仅包含表头的 Excel 文件，确认导出吗？';
+
+  try {
+    await ElMessageBox.confirm(confirmMessage, '导出 Excel', {
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      confirmButtonText: '确认导出',
+      lockScroll: false,
+      modal: false,
+      type: 'warning'
+    });
+  } catch {
+    return;
+  }
+
+  passwordExportLoading.value = true;
+
+  try {
+    const query = new URLSearchParams({
+      userId: getArchiveUserId()
+    });
+    const response = await fetch(`/api/passwords/export?${query.toString()}`, {
+      credentials: 'same-origin'
+    });
+    const contentType = response.headers.get('content-type') || '';
+
+    if (contentType.includes('application/json')) {
+      let message = '密码导出失败';
+
+      try {
+        const payload = await response.json() as ApiResponse<null>;
+
+        if (typeof payload.message === 'string' && payload.message.trim()) {
+          message = payload.message;
+        }
+      } catch {
+        // 接口错误响应异常时使用兜底文案
+      }
+
+      throw new Error(message);
+    }
+
+    if (!response.ok) {
+      throw new Error('密码导出失败');
+    }
+
+    const blob = await response.blob();
+
+    if (blob.size <= 0) {
+      throw new Error('导出的 Excel 文件为空，请稍后重试');
+    }
+
+    const fileName = extractDownloadFileName(response.headers.get('content-disposition')) || '我的密码.xlsx';
+    triggerBlobDownload(blob, fileName);
+    ElMessage.success('密码已导出为 Excel');
+  } catch (error: unknown) {
+    ElMessage.error(error instanceof Error ? error.message : '密码导出失败');
+  } finally {
+    passwordExportLoading.value = false;
+  }
 };
 
 /**
@@ -2694,6 +2739,16 @@ watch(
               />
               <AppButton type="submit" :loading="props.loading">搜索</AppButton>
             </form>
+            <AppButton
+              v-if="isPasswordModule && !isArchiveReadOnly"
+              class="module-detail__export-button"
+              variant="ghost"
+              :loading="passwordExportLoading"
+              @click="exportPasswords"
+            >
+              <el-icon class="module-detail__button-icon module-detail__export-button-icon"><Download /></el-icon>
+              导出 Excel
+            </AppButton>
             <AppButton
               v-if="isPasswordModule && !isArchiveReadOnly"
               variant="secondary"

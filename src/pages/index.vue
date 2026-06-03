@@ -2,7 +2,7 @@
 /**
  * @component HomePage
  * @description 个人档案首页，负责登录状态和首页统计数据
- * @author Codex
+ * @author gouxinjie
  * @created 2026-05-29
  * @updated 2026-06-02
  */

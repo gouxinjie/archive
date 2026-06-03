@@ -2,7 +2,7 @@
 /**
  * @component ArchivePageLoading
  * @description 个人档案全屏加载过渡组件
- * @author Codex
+ * @author gouxinjie
  * @created 2026-06-02
  * @updated 2026-06-02
  */

@@ -2,7 +2,7 @@
 /**
  * @component AppInput
  * @description 通用输入框组件，提供标签、错误提示和密码输入能力
- * @author Codex
+ * @author gouxinjie
  * @created 2026-05-29
  * @updated 2026-05-29
  */

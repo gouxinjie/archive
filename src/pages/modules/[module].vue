@@ -2,7 +2,7 @@
 /**
  * @component ModulePage
  * @description 个人档案模块详情页
- * @author Codex
+ * @author gouxinjie
  * @created 2026-05-29
  * @updated 2026-06-02
  */

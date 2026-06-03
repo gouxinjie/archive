@@ -2,7 +2,7 @@
 /**
  * @component AppButton
  * @description 通用按钮组件，支持主按钮、次按钮和危险按钮
- * @author Codex
+ * @author gouxinjie
  * @created 2026-05-29
  * @updated 2026-05-29
  */

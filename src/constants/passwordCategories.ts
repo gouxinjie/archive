@@ -5,7 +5,21 @@
  */
 
 /** 密码模块推荐分类，按使用场景组织。 */
-export const PASSWORD_CATEGORY_OPTIONS = ['云服务', '开发平台', '社交通讯', '邮箱账号', '银行金融', '支付购物', '游戏娱乐', '学习内容', '政务生活', '其他'] as const;
+export const PASSWORD_CATEGORY_OPTIONS = [
+  '云服务',
+  '开发平台',
+  '办公协作',
+  '社交通讯',
+  '邮箱账号',
+  '银行金融',
+  '支付购物',
+  '出行生活',
+  '游戏娱乐',
+  '学习内容',
+  '政务生活',
+  '个人相关',
+  '其他'
+] as const;
 
 /** 历史分类到新分类的映射，用于兼容旧数据。 */
 export const LEGACY_PASSWORD_CATEGORY_MAP = {

@@ -203,7 +203,7 @@ jobs:
             tar -xzf '$ECS_APP_DIR/deploy-artifact.tar.gz' -C '$ECS_APP_DIR' && \
             rm -f '$ECS_APP_DIR/deploy-artifact.tar.gz' && \
             if pm2 describe '$PM2_NAME' >/dev/null 2>&1; then \
-              PM2_NAME='$PM2_NAME' APP_PORT='$APP_PORT' APP_HOST='$APP_HOST' pm2 restart '$PM2_NAME' --update-env; \
+              PM2_NAME='$PM2_NAME' APP_PORT='$APP_PORT' APP_HOST='$APP_HOST' pm2 restart '$ECS_APP_DIR/ecosystem.config.cjs' --only '$PM2_NAME' --update-env; \
             else \
               PM2_NAME='$PM2_NAME' APP_PORT='$APP_PORT' APP_HOST='$APP_HOST' pm2 start '$ECS_APP_DIR/ecosystem.config.cjs' --only '$PM2_NAME' --update-env; \
             fi && \

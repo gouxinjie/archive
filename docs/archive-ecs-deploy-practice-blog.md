@@ -196,8 +196,10 @@ checkout
 -> 上传 deploy-artifact.tar.gz
 -> SSH 登录 ECS
 -> 解压到 /var/www/archive
--> pm2 restart archive --update-env
+-> pm2 restart /var/www/archive/ecosystem.config.cjs --only archive --update-env
 ```
+
+注意最后一步必须重启**配置文件**而不是进程名，这样 PM2 才会重新解析 `ecosystem.config.cjs`、重新执行 `readDotEnv` 读取 ECS 上真实的 `.env.production`，否则运行时拿不到 `NUXT_SESSION_SECRET`，服务会直接报错。
 
 注意这里构建命令用的是：
 
@@ -232,10 +234,24 @@ Error: listen EADDRINUSE: address already in use 127.0.0.1:3000
 
 最终改成：
 
-- 如果应用已存在，执行 `pm2 restart`
-- 如果应用不存在，执行 `pm2 start`
+- 如果应用已存在，执行 `pm2 restart <配置文件>`
+- 如果应用不存在，执行 `pm2 start <配置文件>`
 
 这样避免了 `reload` 带来的双进程抢端口问题。
+
+但这里还有一个更容易被忽略的坑：重启时必须指向 `ecosystem.config.cjs` 这个配置文件，而不是用进程名 `pm2 restart archive`。因为 `.env.production` 是通过配置文件里的 `readDotEnv` 读取并注入到进程环境的，`pm2 restart <name>` 只会使用 PM2 缓存里保存的旧进程配置，不会重新读取配置文件，也就不会重新加载 `.env.production`。一旦进程环境里的密钥丢失，运行时就可能报：
+
+```text
+生产环境缺少 NUXT_SESSION_SECRET 环境变量
+```
+
+正确做法是：
+
+```bash
+pm2 restart /var/www/archive/ecosystem.config.cjs --only archive --update-env
+```
+
+这样每次部署都会重新解析配置文件、重新读取 `.env.production`，确保 `NUXT_SESSION_SECRET`、`NUXT_FILE_PREVIEW_SECRET`、数据库路径等生产变量和构建产物保持一致。
 
 ### 2. better-sqlite3 原生模块和 Node 版本不一致
 

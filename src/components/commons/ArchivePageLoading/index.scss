@@ -29,12 +29,18 @@
     border: 1px solid rgba(47, 107, 255, 0.14);
     border-radius: 14px;
     box-shadow: 0 10px 20px rgba(47, 107, 255, 0.07);
-    color: $color-primary;
     display: inline-flex;
-    font-size: 22px;
     height: 46px;
     justify-content: center;
+    overflow: hidden;
     width: 46px;
+  }
+
+  &__icon-image {
+    border-radius: 9px;
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
   }
 
   &__title {
@@ -80,7 +86,6 @@
 @media (max-width: 640px) {
   .archive-page-loading {
     &__icon {
-      font-size: 20px;
       height: 42px;
       width: 42px;
     }

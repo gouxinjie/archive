@@ -9,11 +9,11 @@
 
 import { computed, ref } from 'vue';
 import {
-  FolderOpened,
   Lock,
   User,
   View
 } from '@element-plus/icons-vue';
+import archiveIcon from '~/assets/images/archive-icon.png';
 import AppButton from '~/components/commons/AppButton/index.vue';
 import { APP_NAME } from '~/constants/app';
 
@@ -60,9 +60,12 @@ const submit = (): void => {
     <section class="entry-gate__layout" aria-label="个人档案登录">
       <section class="entry-gate__hero" aria-label="个人档案介绍">
         <div class="entry-gate__brand">
-          <span class="entry-gate__brand-mark" aria-hidden="true">
-            <FolderOpened />
-          </span>
+          <img
+            class="entry-gate__brand-mark"
+            :src="archiveIcon"
+            alt=""
+            aria-hidden="true"
+          >
           <strong class="entry-gate__brand-name">{{ APP_NAME }}</strong>
         </div>
 
@@ -78,7 +81,11 @@ const submit = (): void => {
       <section class="entry-gate__login-area" aria-label="登录表单">
         <div class="entry-gate__panel">
           <div class="entry-gate__panel-icon" aria-hidden="true">
-            <FolderOpened />
+            <img
+              class="entry-gate__panel-icon-image"
+              :src="archiveIcon"
+              alt=""
+            >
           </div>
 
           <header class="entry-gate__panel-head">

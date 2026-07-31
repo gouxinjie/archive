@@ -9,6 +9,7 @@
 
 import { computed, ref, watch } from 'vue';
 import MarkdownIt from 'markdown-it';
+import archiveIcon from '~/assets/images/archive-icon.png';
 import {
   ArrowRight,
   Close,
@@ -2630,7 +2631,12 @@ watch(
     <header class="module-detail__header">
       <div class="module-detail__topbar">
         <button class="module-detail__brand" type="button" @click="emit('backHome')">
-          <span class="module-detail__brand-mark">A</span>
+          <img
+            class="module-detail__brand-mark"
+            :src="archiveIcon"
+            alt=""
+            aria-hidden="true"
+          >
           <span class="module-detail__brand-copy">
             <span class="module-detail__brand-en">{{ APP_ENGLISH_NAME }}</span>
             <span class="module-detail__breadcrumb">

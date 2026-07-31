@@ -7,7 +7,7 @@
  * @updated 2026-06-02
  */
 
-import { FolderOpened } from '@element-plus/icons-vue';
+import archiveIcon from '~/assets/images/archive-icon.png';
 
 interface ArchivePageLoadingProps {
   /** 类型：字符串；含义：加载态主标题；是否必填：否；默认值：正在进入个人档案 */
@@ -26,7 +26,7 @@ const props = withDefaults(defineProps<ArchivePageLoadingProps>(), {
   <section class="archive-page-loading" role="status" aria-live="polite" aria-busy="true">
     <div class="archive-page-loading__shell">
       <span class="archive-page-loading__icon" aria-hidden="true">
-        <FolderOpened />
+        <img class="archive-page-loading__icon-image" :src="archiveIcon" alt="">
       </span>
       <h1 class="archive-page-loading__title">{{ props.title }}</h1>
       <p class="archive-page-loading__description">{{ props.description }}</p>

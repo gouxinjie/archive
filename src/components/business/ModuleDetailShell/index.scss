@@ -56,7 +56,7 @@
     border: 0;
     color: $color-text-main;
     display: flex;
-    gap: $space-2;
+    gap: $space-3;
     min-width: 0;
     padding: 0;
     text-align: left;
@@ -69,18 +69,12 @@
   }
 
   &__brand-mark {
-    align-items: center;
-    background: linear-gradient(135deg, #5b8cff 0%, $color-primary 100%);
-    border-radius: 6px;
+    border-radius: 7px;
     box-shadow: 0 6px 14px rgba(47, 107, 255, 0.18);
-    color: #ffffff;
-    display: inline-flex;
-    flex: 0 0 24px;
-    font-size: 13px;
-    font-weight: 900;
-    height: 24px;
-    justify-content: center;
-    width: 24px;
+    flex: 0 0 32px;
+    height: 32px;
+    object-fit: cover;
+    width: 32px;
   }
 
   &__brand-en {

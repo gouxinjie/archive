@@ -9,6 +9,7 @@
 
 import { computed } from 'vue';
 import { ElDropdown, ElDropdownItem, ElDropdownMenu } from 'element-plus';
+import archiveIcon from '~/assets/images/archive-icon.png';
 import AppButton from '~/components/commons/AppButton/index.vue';
 import { APP_ENGLISH_NAME, APP_NAME, ARCHIVE_MODULES } from '~/constants/app';
 import type { DashboardSummaryData } from '~/types/api';
@@ -186,7 +187,12 @@ const handleUserMenuCommand = (command: UserMenuCommand): void => {
     <header class="dashboard-shell__header">
       <div class="dashboard-shell__topbar">
         <div class="dashboard-shell__brand">
-          <span class="dashboard-shell__brand-mark">A</span>
+          <img
+            class="dashboard-shell__brand-mark"
+            :src="archiveIcon"
+            alt=""
+            aria-hidden="true"
+          >
           <span>
             <span class="dashboard-shell__brand-en">{{ APP_ENGLISH_NAME }}</span>
             <strong class="dashboard-shell__brand-name">{{ APP_NAME }}</strong>

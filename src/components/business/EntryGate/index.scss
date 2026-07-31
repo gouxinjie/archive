@@ -57,22 +57,16 @@
   &__brand-mark,
   &__panel-icon {
     align-items: center;
-    background: linear-gradient(135deg, #5d93ff 0%, #4467f0 100%);
-    color: #ffffff;
     display: inline-flex;
     justify-content: center;
-
-    svg {
-      height: 58%;
-      width: 58%;
-    }
   }
 
   &__brand-mark {
-    border-radius: 4px;
+    border-radius: 5px;
     box-shadow: 0 8px 18px rgba(37, 78, 144, 0.18);
-    height: 26px;
-    width: 26px;
+    height: 30px;
+    object-fit: cover;
+    width: 30px;
   }
 
   &__brand-name {
@@ -172,16 +166,15 @@
       inset: 0;
       position: absolute;
     }
+  }
 
-    svg {
-      background: linear-gradient(135deg, #6da4ff 0%, #4768f4 100%);
-      border-radius: 8px;
-      box-shadow: 0 10px 20px rgba(67, 104, 232, 0.22);
-      height: 38px;
-      padding: 8px;
-      position: relative;
-      width: 38px;
-    }
+  &__panel-icon-image {
+    border-radius: 14px;
+    box-shadow: 0 10px 20px rgba(67, 104, 232, 0.22);
+    height: clamp(46px, 6.4vh, 54px);
+    object-fit: cover;
+    position: relative;
+    width: clamp(46px, 6.4vh, 54px);
   }
 
   &__panel-head {
@@ -422,11 +415,11 @@
       height: 72px;
       margin-bottom: 24px;
       width: 72px;
+    }
 
-      svg {
-        height: 34px;
-        width: 34px;
-      }
+    &__panel-icon-image {
+      height: 46px;
+      width: 46px;
     }
 
     &__copyright {

@@ -4,7 +4,18 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-05-29',
   devtools: { enabled: true },
   app: {
-    pageTransition: { name: 'page', mode: 'out-in' }
+    pageTransition: { name: 'page', mode: 'out-in' },
+    head: {
+      title: '个人档案 · Archive',
+      meta: [
+        { name: 'theme-color', content: '#2f6bff' }
+      ],
+      link: [
+        { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/images/archive-icon.png' },
+        { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/images/archive-icon.png' },
+        { rel: 'apple-touch-icon', sizes: '180x180', href: '/images/archive-icon.png' }
+      ]
+    }
   },
   srcDir: 'src/',
   modules: ['@nuxt/eslint'],

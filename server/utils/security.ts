@@ -247,15 +247,6 @@ export const hasMasterPassword = (): boolean => {
 };
 
 /**
- * 获取个人密码哈希
- * @returns 密码哈希，未设置时返回 null
- * @throws 当数据库查询失败时抛出异常
- */
-export const getMasterPasswordHash = (): string | null => {
-  return getSetting(MASTER_PASSWORD_KEY);
-};
-
-/**
  * 获取个人密码设置键名
  * @returns 设置键名
  * @throws 不抛出异常

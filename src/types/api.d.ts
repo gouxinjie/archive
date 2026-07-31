@@ -73,8 +73,3 @@ export interface DashboardSummaryData {
   /** 类型：数字；含义：学习资料数量；是否必填：是；默认值：0 */
   studyCount: number;
 }
-
-export interface ModuleQueryData {
-  /** 类型：字符串；含义：搜索关键词；是否必填：否；默认值：空字符串 */
-  keyword?: string;
-}

@@ -36,17 +36,6 @@ export interface ResumeUploadPayload {
   remark: string | null;
 }
 
-export interface ResumeUpdateRequestBody {
-  /** 类型：未知；含义：请求用户标识；是否必填：是；默认值：无 */
-  userId?: unknown;
-  /** 类型：未知；含义：简历标题；是否必填：是；默认值：无 */
-  title?: unknown;
-  /** 类型：未知；含义：简历分类；是否必填：否；默认值：通用 */
-  category?: unknown;
-  /** 类型：未知；含义：备注；是否必填：否；默认值：null */
-  remark?: unknown;
-}
-
 export interface ResumeUpdatePayload {
   /** 类型：字符串；含义：简历标题；是否必填：是；默认值：无 */
   title: string;
@@ -239,23 +228,6 @@ export const parseResumeUploadForm = (entries: MultipartEntry[] | undefined): Re
     category: normalizeOptionalText(readTextField(entries, 'category')) || '通用',
     ...resumeFile,
     remark: normalizeOptionalText(readTextField(entries, 'remark'))
-  };
-};
-
-/**
- * 解析简历元信息更新请求
- * @param body - 请求体
- * @returns 标准化后的简历元信息
- * @throws 当标题或用户标识不合法时抛出错误
- */
-export const parseResumeUpdatePayload = (body: ResumeUpdateRequestBody): ResumeUpdatePayload => {
-  assertValidUserId(body.userId);
-
-  return {
-    title: normalizeRequiredBodyText(body.title, '简历标题'),
-    category: normalizeOptionalBodyText(body.category) || '通用',
-    replacementFile: null,
-    remark: normalizeOptionalBodyText(body.remark)
   };
 };
 

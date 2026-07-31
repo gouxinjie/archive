@@ -539,18 +539,6 @@ export const listArchiveProfiles = (): ArchiveProfileRow[] => {
 };
 
 /**
- * 查询所有用户账号
- * @returns 用户账号列表
- * @throws 当查询失败时抛出异常
- */
-export const listUsers = (): UserRow[] => {
-  const database = getDatabase();
-  return database
-    .prepare('SELECT id, username, display_name, password_hash, status FROM users ORDER BY created_at ASC')
-    .all() as UserRow[];
-};
-
-/**
  * 按账号查询用户
  * @param username - 登录账号
  * @returns 用户账号，不存在时返回 null

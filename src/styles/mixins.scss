@@ -11,13 +11,6 @@
   outline-offset: 2px;
 }
 
-@mixin panel-surface {
-  background: $color-bg-panel;
-  border: 1px solid $color-border-soft;
-  border-radius: $radius-md;
-  box-shadow: $shadow-panel;
-}
-
 @mixin text-ellipsis {
   overflow: hidden;
   text-overflow: ellipsis;

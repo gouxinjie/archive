@@ -13,17 +13,6 @@ export interface ArchiveModuleConfig {
   tone: ArchiveModuleTone;
 }
 
-export interface RecentFileItem {
-  /** 类型：字符串；含义：文件唯一标识；是否必填：是；默认值：无 */
-  id: string;
-  /** 类型：字符串；含义：文件标题；是否必填：是；默认值：无 */
-  title: string;
-  /** 类型：ArchiveModuleKey；含义：所属模块；是否必填：是；默认值：无 */
-  module: ArchiveModuleKey;
-  /** 类型：字符串；含义：上传时间；是否必填：是；默认值：无 */
-  createdAt: string;
-}
-
 export interface PasswordListItem {
   /** 类型：字符串；含义：密码记录唯一标识；是否必填：是；默认值：无 */
   id: string;
